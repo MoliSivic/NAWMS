@@ -79,6 +79,10 @@ const StockInPage: React.FC = () => {
                 </div>
               </div>
               <div>
+                <label className="block text-xs text-muted-foreground mb-1">Product Type</label>
+                <input type="text" value="Money" readOnly className="w-full px-3 py-1.5 border rounded text-xs bg-muted" />
+              </div>
+              <div>
                 <label className="block text-xs text-muted-foreground mb-1">Source</label>
                 <Select value={source} onValueChange={setSource}>
                   <SelectTrigger className="h-9 text-xs">
