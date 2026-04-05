@@ -37,9 +37,47 @@ export interface WarehouseCanvasProps {
 }
 
 // ─── Helpers ───
-const LERP_SPEED = 0.08;
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
+const ROUTE_SPEED_FACTOR = 0.8;
+const MIN_ROUTE_SPEED = 0.9; // meters per second
+const MAX_FRAME_DELTA = 0.05; // cap large RAF gaps to avoid visible jumps
+
+function distance(ax: number, ay: number, bx: number, by: number) {
+  return Math.hypot(bx - ax, by - ay);
+}
+
+function nearestRouteIndex(route: RouteWaypoint[], x: number, y: number) {
+  let bestIdx = 0;
+  let bestDist = Number.POSITIVE_INFINITY;
+
+  route.forEach((wp, idx) => {
+    const d = distance(x, y, wp.x, wp.y);
+    if (d < bestDist) {
+      bestDist = d;
+      bestIdx = idx;
+    }
+  });
+
+  return bestIdx;
+}
+
+function syncTargetToRoute(robot: CanvasRobot) {
+  if (!robot.route.length) return;
+  const waypoint = robot.route[robot.routeIdx];
+  robot.targetX = waypoint.x;
+  robot.targetY = waypoint.y;
+}
+
+function advanceRoute(robot: CanvasRobot) {
+  if (robot.route.length < 2) return;
+
+  let nextIdx = robot.routeIdx + robot.routeDir;
+  if (nextIdx < 0 || nextIdx >= robot.route.length) {
+    robot.routeDir = robot.routeDir === 1 ? -1 : 1;
+    nextIdx = robot.routeIdx + robot.routeDir;
+  }
+
+  robot.routeIdx = Math.max(0, Math.min(robot.route.length - 1, nextIdx));
+  syncTargetToRoute(robot);
 }
 
 /** Map initial mock robot positions to valid aisle/corridor locations (warehouse meters) */
@@ -96,20 +134,33 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
       const pos = initRobotPos(r);
       const task = activeTask(r.robotId);
       let route: RouteWaypoint[] = [];
+      let routeIdx = 0;
+      let routeDir: 1 | -1 = 1;
+      let targetX = pos.x;
+      let targetY = pos.y;
+
       if (task) {
         const fromWp = locationToWaypointId(task.sourceLocation);
         const toWp = locationToWaypointId(task.targetLocation);
         route = findRoute(fromWp, toWp);
+
+        if (route.length > 0) {
+          routeIdx = nearestRouteIndex(route, pos.x, pos.y);
+          routeDir = routeIdx >= route.length - 1 ? -1 : 1;
+          targetX = route[routeIdx].x;
+          targetY = route[routeIdx].y;
+        }
       }
+
       return {
         ...r,
         displayX: pos.x,
         displayY: pos.y,
-        targetX: pos.x,
-        targetY: pos.y,
+        targetX,
+        targetY,
         route,
-        routeIdx: 0,
-        routeDir: 1 as const,
+        routeIdx,
+        routeDir,
       };
     });
   }, []);
@@ -137,34 +188,45 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    let tickCount = 0;
+    let lastFrameTs = 0;
 
-    function tick() {
-      tickCount++;
+    function tick(timestamp: number) {
+      const deltaSec = lastFrameTs === 0
+        ? 0
+        : Math.min((timestamp - lastFrameTs) / 1000, MAX_FRAME_DELTA);
+      lastFrameTs = timestamp;
+
       const s = pxPerM();
       scaleRef.current = s;
 
-      // Advance robots along routes every ~60 ticks (~1s at 60fps)
-      // Ping-pong: when reaching either end, reverse direction so the robot
-      // retraces the same path instead of jumping back through racks.
-      if (tickCount % 60 === 0) {
-        for (const rb of robotsRef.current) {
-          if (rb.status !== 'active' || rb.route.length < 2) continue;
-          const nextIdx = rb.routeIdx + rb.routeDir;
-          if (nextIdx < 0 || nextIdx >= rb.route.length) {
-            rb.routeDir = (rb.routeDir === 1 ? -1 : 1) as 1 | -1;
-          }
-          rb.routeIdx = Math.max(0, Math.min(rb.route.length - 1, rb.routeIdx + rb.routeDir));
-          const wp = rb.route[rb.routeIdx];
-          rb.targetX = wp.x;
-          rb.targetY = wp.y;
-        }
-      }
-
-      // Lerp display positions
+      // Move active robots continuously along their route at a capped speed.
       for (const rb of robotsRef.current) {
-        rb.displayX = lerp(rb.displayX, rb.targetX, LERP_SPEED);
-        rb.displayY = lerp(rb.displayY, rb.targetY, LERP_SPEED);
+        if (rb.status !== 'active' || rb.route.length === 0 || deltaSec === 0) continue;
+
+        let remainingStep = Math.max(MIN_ROUTE_SPEED, rb.currentSpeed * ROUTE_SPEED_FACTOR) * deltaSec;
+        while (remainingStep > 0) {
+          const distToTarget = distance(rb.displayX, rb.displayY, rb.targetX, rb.targetY);
+
+          if (distToTarget < 0.01) {
+            rb.displayX = rb.targetX;
+            rb.displayY = rb.targetY;
+            advanceRoute(rb);
+            if (distance(rb.displayX, rb.displayY, rb.targetX, rb.targetY) < 0.01) break;
+            continue;
+          }
+
+          const step = Math.min(remainingStep, distToTarget);
+          const progress = step / distToTarget;
+          rb.displayX += (rb.targetX - rb.displayX) * progress;
+          rb.displayY += (rb.targetY - rb.displayY) * progress;
+          remainingStep -= step;
+
+          if (step >= distToTarget) {
+            rb.displayX = rb.targetX;
+            rb.displayY = rb.targetY;
+            advanceRoute(rb);
+          }
+        }
       }
 
       draw(ctx!, s);
@@ -213,15 +275,33 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
 
     // Zones
     for (const zone of layout.zones) {
+      const zoneX = toCanvasX(zone.x);
+      const zoneY = toCanvasY(zone.y);
+      const zoneW = zone.width * s;
+      const zoneH = zone.height * s;
+      const labelBandH = Math.max(16, s * 0.95);
+      const fullLabel = zone.label;
+      const shortLabel = zone.label.split('—')[0].trim();
+
       ctx.fillStyle = zone.color + '40'; // semi-transparent
-      ctx.fillRect(toCanvasX(zone.x), toCanvasY(zone.y), zone.width * s, zone.height * s);
+      ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
       ctx.strokeStyle = zone.color + '99';
       ctx.lineWidth = 1.5;
-      ctx.strokeRect(toCanvasX(zone.x), toCanvasY(zone.y), zone.width * s, zone.height * s);
-      // Label
+      ctx.strokeRect(zoneX, zoneY, zoneW, zoneH);
+
+      // Reserve a slim header strip so zone titles stay clear of the shelves.
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+      ctx.fillRect(zoneX, zoneY, zoneW, labelBandH);
+
+      ctx.save();
       ctx.fillStyle = '#e2e8f0';
-      ctx.font = `bold ${Math.max(10, s * 1.2)}px sans-serif`;
-      ctx.fillText(zone.label, toCanvasX(zone.x) + 6, toCanvasY(zone.y) + Math.max(14, s * 1.8));
+      ctx.font = `600 ${Math.max(10, s * 0.8)}px sans-serif`;
+      const labelMaxW = zoneW - 16;
+      const label = ctx.measureText(fullLabel).width <= labelMaxW ? fullLabel : shortLabel;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(label, zoneX + zoneW / 2, zoneY + labelBandH / 2);
+      ctx.restore();
     }
 
     // Aisles

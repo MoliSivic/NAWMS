@@ -34,7 +34,8 @@ import { mockPallets, mockShelfLocations } from './mockData';
 const SHELF_W = 5;
 const SHELF_H = 3;
 const SHELF_GAP = 1.5;  // gap between shelves in a row
-const ZONE_PADDING = 1;
+const ZONE_SIDE_PADDING = 1;
+const ZONE_TOP_PADDING = 1.6;
 
 // Build shelves for a zone at given starting position
 function buildShelves(
@@ -81,10 +82,10 @@ const ZONE_B = { x: 4, y: 11, w: 52, h: 5 };
 const ZONE_C = { x: 4, y: 19, w: 27, h: 7 };
 const ZONE_D = { x: 33, y: 19, w: 23, h: 7 };
 
-const shelvesA = buildShelves('ZONE-A', 'A', 4, ZONE_A.x + ZONE_PADDING, ZONE_A.y + ZONE_PADDING);
-const shelvesB = buildShelves('ZONE-B', 'B', 6, ZONE_B.x + ZONE_PADDING, ZONE_B.y + ZONE_PADDING);
-const shelvesC = buildShelves('ZONE-C', 'C', 4, ZONE_C.x + ZONE_PADDING, ZONE_C.y + ZONE_PADDING);
-const shelvesD = buildShelves('ZONE-D', 'D', 3, ZONE_D.x + ZONE_PADDING, ZONE_D.y + ZONE_PADDING);
+const shelvesA = buildShelves('ZONE-A', 'A', 4, ZONE_A.x + ZONE_SIDE_PADDING, ZONE_A.y + ZONE_TOP_PADDING);
+const shelvesB = buildShelves('ZONE-B', 'B', 6, ZONE_B.x + ZONE_SIDE_PADDING, ZONE_B.y + ZONE_TOP_PADDING);
+const shelvesC = buildShelves('ZONE-C', 'C', 4, ZONE_C.x + ZONE_SIDE_PADDING, ZONE_C.y + ZONE_TOP_PADDING);
+const shelvesD = buildShelves('ZONE-D', 'D', 3, ZONE_D.x + ZONE_SIDE_PADDING, ZONE_D.y + ZONE_TOP_PADDING);
 
 // ─── Route network ───
 // The main corridor runs at x=2, LEFT of all zones (zones start at x=4).
