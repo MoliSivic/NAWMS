@@ -4,8 +4,6 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { mockPallets, mockRobots, mockPackages, mockZones, mockTasks, mockOptimizations, mockShelfLocations } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/contexts/AuthContext';
-
 const stockData = [
   { day: 'Mon', stockIn: 12, stockOut: 8 }, { day: 'Tue', stockIn: 15, stockOut: 10 },
   { day: 'Wed', stockIn: 8, stockOut: 12 }, { day: 'Thu', stockIn: 20, stockOut: 5 },
@@ -48,7 +46,7 @@ const dailySummary = [
 
 type ReportType = 'stock-level' | 'movement' | 'reorganization' | 'robot-performance' | 'robot-energy' | 'shelf-utilization' | 'daily-summary';
 
-const reportTabs: { key: ReportType; label: string; technicianOnly?: boolean }[] = [
+const reportTabs: { key: ReportType; label: string }[] = [
   { key: 'stock-level', label: 'Stock Level Summary' },
   { key: 'movement', label: 'Stock Movement History' },
   { key: 'reorganization', label: 'Reorganization Log' },
@@ -59,16 +57,12 @@ const reportTabs: { key: ReportType; label: string; technicianOnly?: boolean }[]
 ];
 
 const ReportsPage: React.FC = () => {
-  const { user } = useAuth();
   const [tab, setTab] = useState<ReportType>('stock-level');
   const [dateFrom, setDateFrom] = useState('2026-03-28');
   const [dateTo, setDateTo] = useState('2026-04-04');
   const [zoneFilter, setZoneFilter] = useState('all');
 
-  // Technician can only see robot reports
-  const availableTabs = user?.role === 'technician'
-    ? reportTabs.filter(t => t.key === 'robot-performance' || t.key === 'robot-energy')
-    : reportTabs;
+  const availableTabs = reportTabs;
 
   const handleExport = () => {
     alert('Report exported to PDF (mock). In production, this generates a downloadable PDF file.');

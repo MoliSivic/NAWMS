@@ -46,7 +46,7 @@ const PalletPage: React.FC = () => {
               {detailPkgs.length > 0 && <div><p className="font-medium mb-2">Packages on Pallet</p><div className="space-y-1 max-h-40 overflow-y-auto">{detailPkgs.map(pkg => (
                 <div key={pkg.packageId} className="flex justify-between p-2 bg-muted rounded text-[10px]"><span className="font-mono">{pkg.packageId}</span><span>{pkg.currency} {pkg.totalValue.toLocaleString()}</span></div>
               ))}</div></div>}
-              <div className="p-3 bg-amber-50 rounded text-[10px] text-amber-800">⚠ Pallet reassignment is an exception operation requiring supervisor approval.</div>
+              <div className="p-3 bg-amber-50 rounded text-[10px] text-amber-800">Pallet reassignment is an exception operation requiring admin authorization.</div>
             </div>
           ) : <p className="text-xs text-muted-foreground">Select a pallet to view details.</p>}
         </div>

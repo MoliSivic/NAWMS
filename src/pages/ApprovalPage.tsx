@@ -12,12 +12,12 @@ const ApprovalPage: React.FC = () => {
   const filtered = approvals.filter(a => filter === 'all' || a.status === filter);
 
   const handleApprove = (id: string) => {
-    setApprovals(prev => prev.map(a => a.approvalId === id ? { ...a, status: 'approved' as const, reviewedBy: 'USR-004', reviewedAt: new Date().toISOString() } : a));
+    setApprovals(prev => prev.map(a => a.approvalId === id ? { ...a, status: 'approved' as const, reviewedBy: 'USR-001', reviewedAt: new Date().toISOString() } : a));
   };
 
   const handleReject = (id: string) => {
     if (!rejectReason.trim()) return;
-    setApprovals(prev => prev.map(a => a.approvalId === id ? { ...a, status: 'rejected' as const, reviewedBy: 'USR-004', reviewedAt: new Date().toISOString(), reason: `Rejected: ${rejectReason}` } : a));
+    setApprovals(prev => prev.map(a => a.approvalId === id ? { ...a, status: 'rejected' as const, reviewedBy: 'USR-001', reviewedAt: new Date().toISOString(), reason: `Rejected: ${rejectReason}` } : a));
     setRejectingId(null);
     setRejectReason('');
   };

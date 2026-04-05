@@ -65,8 +65,8 @@ const DashboardPage: React.FC = () => {
         <p className="text-sm text-muted-foreground">Welcome back, {user?.name} — {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
       </div>
 
-      {/* === SUPERVISOR: Pending Approvals Banner === */}
-      {role === 'supervisor' && pendingApprovals.length > 0 && (
+      {/* === ADMIN: Pending Approvals Banner === */}
+      {role === 'admin' && pendingApprovals.length > 0 && (
         <div className="p-4 bg-amber-50 border border-warning/20 rounded-lg cursor-pointer hover:bg-amber-100 transition-colors" onClick={() => navigate('/approvals')}>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -83,8 +83,8 @@ const DashboardPage: React.FC = () => {
         </div>
       )}
 
-      {/* === TECHNICIAN: Robot Alert Banner === */}
-      {role === 'technician' && mockRobots.some(r => r.status === 'error' || r.batteryLevel < 20) && (
+      {/* === ADMIN: Robot Alert Banner === */}
+      {role === 'admin' && mockRobots.some(r => r.status === 'error' || r.batteryLevel < 20) && (
         <div className="p-4 bg-red-50 border border-destructive/20 rounded-lg cursor-pointer hover:bg-red-100 transition-colors" onClick={() => navigate('/robots')}>
           <div className="flex items-center gap-3">
             <AlertTriangle className="w-5 h-5 text-destructive" />
@@ -104,31 +104,21 @@ const DashboardPage: React.FC = () => {
         <StatCard icon={Package} label="Total Packages" value={dashboardStats.totalPackages} color="bg-navy-100 text-navy-700" />
         <StatCard icon={DollarSign} label="Total Stored Value" value={formatCurrency(dashboardStats.totalStoredValue)} color="bg-green-50 text-success" sub="Across all zones" />
 
-        {/* Operator & Admin: stock in/out focus */}
-        {(role === 'admin' || role === 'operator') && (
-          <>
-            <StatCard icon={ArrowDownToLine} label="Stock In Today" value={dashboardStats.stockInToday} color="bg-blue-50 text-info" onClick={() => navigate('/stock-in')} />
-            <StatCard icon={ArrowUpFromLine} label="Stock Out Today" value={dashboardStats.stockOutToday} color="bg-amber-50 text-warning" onClick={() => navigate('/stock-out')} />
-          </>
-        )}
+        {/* Stock in/out */}
+        <StatCard icon={ArrowDownToLine} label="Stock In Today" value={dashboardStats.stockInToday} color="bg-blue-50 text-info" onClick={() => navigate('/stock-in')} />
+        <StatCard icon={ArrowUpFromLine} label="Stock Out Today" value={dashboardStats.stockOutToday} color="bg-amber-50 text-warning" onClick={() => navigate('/stock-out')} />
 
-        {/* Supervisor: approvals & tasks focus */}
-        {(role === 'admin' || role === 'supervisor') && (
+        {/* Admin: approvals, tasks, robot stats */}
+        {role === 'admin' && (
           <>
             <StatCard icon={ClipboardCheck} label="Pending Approvals" value={dashboardStats.pendingApprovals} color="bg-orange-50 text-warning" onClick={() => navigate('/approvals')} />
             <StatCard icon={TrendingUp} label="Tasks Completed" value={mockTasks.filter(t => t.status === 'completed').length} color="bg-green-50 text-success" sub="Last 7 days" />
-          </>
-        )}
-
-        {/* Technician: robot focus */}
-        {(role === 'admin' || role === 'technician') && (
-          <>
             <StatCard icon={Bot} label="Active Robot Tasks" value={dashboardStats.activeRobotTasks} color="bg-navy-100 text-navy-600" onClick={() => navigate('/robots')} />
             <StatCard icon={BatteryLow} label="Low Battery Alerts" value={dashboardStats.lowBatteryAlerts} color="bg-red-50 text-destructive" onClick={() => navigate('/robots')} />
           </>
         )}
 
-        {/* Operator-only extras */}
+        {/* Operator extras */}
         {role === 'operator' && (
           <>
             <StatCard icon={Bot} label="Active Robot Tasks" value={dashboardStats.activeRobotTasks} color="bg-navy-100 text-navy-600" />
@@ -137,9 +127,8 @@ const DashboardPage: React.FC = () => {
         )}
       </div>
 
-      {/* Charts — shown to admin, operator, supervisor */}
-      {role !== 'technician' && (
-        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+      {/* Charts */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
           <div className="bg-card rounded-lg border p-4 md:p-5">
             <h3 className="text-2xl font-semibold uppercase tracking-wide text-foreground">Stock Movement Trend</h3>
             <div className="mt-4 h-[320px]">
@@ -176,40 +165,6 @@ const DashboardPage: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {/* Technician: Full robot fleet as primary content */}
-      {role === 'technician' && (
-        <div className="bg-card rounded-lg border">
-          <div className="p-4 border-b">
-            <h3 className="text-sm font-medium flex items-center gap-2"><Bot className="w-4 h-4" /> Robot Fleet Status</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x">
-            {mockRobots.map(robot => (
-              <div key={robot.robotId} className="p-4 cursor-pointer hover:bg-muted/30 transition-colors" onClick={() => navigate('/robots')}>
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">{robot.robotId} — {robot.model}</p>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                    robot.status === 'active' ? 'bg-green-50 text-success' :
-                    robot.status === 'idle' ? 'bg-amber-50 text-warning' :
-                    robot.status === 'error' ? 'bg-red-50 text-destructive' :
-                    'bg-muted text-muted-foreground'
-                  }`}>{robot.status}</span>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Battery</span><span className={robot.batteryLevel < 20 ? 'text-destructive font-medium' : ''}>{robot.batteryLevel}%</span></div>
-                  <div className="w-full h-1.5 bg-muted rounded-full"><div className={`h-full rounded-full transition-all ${robot.batteryLevel < 20 ? 'bg-destructive' : robot.batteryLevel < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${robot.batteryLevel}%` }} /></div>
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Temperature</span><span className={robot.temperature > 50 ? 'text-destructive font-medium' : ''}>{robot.temperature}°C</span></div>
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Load</span><span>{robot.currentLoadKg} / {robot.maxLoadKg} kg</span></div>
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Speed</span><span>{robot.currentSpeed} m/s</span></div>
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Tasks Done</span><span>{robot.totalTasksCompleted}</span></div>
-                  {robot.errorCode && <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Error</span><span className="text-destructive font-medium">{robot.errorCode}</span></div>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Tasks — shown to all */}
@@ -260,35 +215,40 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Robot Fleet Summary — shown to admin and operator (not technician, they get the detailed view above) */}
-      {role !== 'technician' && (
-        <div className="bg-card rounded-lg border">
-          <div className="p-4 border-b">
-            <h3 className="text-sm font-medium flex items-center gap-2"><Bot className="w-4 h-4" /> Robot Fleet Overview</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x">
-            {mockRobots.map(robot => (
-              <div key={robot.robotId} className="p-4">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-sm font-medium">{robot.robotId}</p>
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
-                    robot.status === 'active' ? 'bg-green-50 text-success' :
-                    robot.status === 'idle' ? 'bg-amber-50 text-warning' :
-                    robot.status === 'error' ? 'bg-red-50 text-destructive' :
-                    'bg-muted text-muted-foreground'
-                  }`}>{robot.status}</span>
-                </div>
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Battery</span><span className={robot.batteryLevel < 20 ? 'text-destructive font-medium' : ''}>{robot.batteryLevel}%</span></div>
-                  <div className="w-full h-1.5 bg-muted rounded-full"><div className={`h-full rounded-full transition-all ${robot.batteryLevel < 20 ? 'bg-destructive' : robot.batteryLevel < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${robot.batteryLevel}%` }} /></div>
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Temperature</span><span className={robot.temperature > 50 ? 'text-destructive font-medium' : ''}>{robot.temperature}°C</span></div>
-                  <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Tasks Done</span><span>{robot.totalTasksCompleted}</span></div>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* Robot Fleet — detailed for admin, overview for operator */}
+      <div className="bg-card rounded-lg border">
+        <div className="p-4 border-b">
+          <h3 className="text-sm font-medium flex items-center gap-2"><Bot className="w-4 h-4" /> Robot Fleet {role === 'admin' ? 'Status' : 'Overview'}</h3>
         </div>
-      )}
+        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x">
+          {mockRobots.map(robot => (
+            <div key={robot.robotId} className={`p-4 ${role === 'admin' ? 'cursor-pointer hover:bg-muted/30 transition-colors' : ''}`} onClick={role === 'admin' ? () => navigate('/robots') : undefined}>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium">{robot.robotId}{role === 'admin' ? ` — ${robot.model}` : ''}</p>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                  robot.status === 'active' ? 'bg-green-50 text-success' :
+                  robot.status === 'idle' ? 'bg-amber-50 text-warning' :
+                  robot.status === 'error' ? 'bg-red-50 text-destructive' :
+                  'bg-muted text-muted-foreground'
+                }`}>{robot.status}</span>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Battery</span><span className={robot.batteryLevel < 20 ? 'text-destructive font-medium' : ''}>{robot.batteryLevel}%</span></div>
+                <div className="w-full h-1.5 bg-muted rounded-full"><div className={`h-full rounded-full transition-all ${robot.batteryLevel < 20 ? 'bg-destructive' : robot.batteryLevel < 50 ? 'bg-warning' : 'bg-success'}`} style={{ width: `${robot.batteryLevel}%` }} /></div>
+                <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Temperature</span><span className={robot.temperature > 50 ? 'text-destructive font-medium' : ''}>{robot.temperature}°C</span></div>
+                {role === 'admin' && (
+                  <>
+                    <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Load</span><span>{robot.currentLoadKg} / {robot.maxLoadKg} kg</span></div>
+                    <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Speed</span><span>{robot.currentSpeed} m/s</span></div>
+                  </>
+                )}
+                <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Tasks Done</span><span>{robot.totalTasksCompleted}</span></div>
+                {role === 'admin' && robot.errorCode && <div className="flex justify-between text-[10px]"><span className="text-muted-foreground">Error</span><span className="text-destructive font-medium">{robot.errorCode}</span></div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 };

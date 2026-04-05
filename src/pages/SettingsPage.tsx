@@ -57,9 +57,7 @@ const UserManagement: React.FC = () => {
               <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="operator">Operator</SelectItem>
-                <SelectItem value="supervisor">Supervisor</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="technician">Technician</SelectItem>
               </SelectContent>
             </Select>
             <input value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} placeholder="Email" className="px-2 py-1.5 border rounded text-xs bg-background" />

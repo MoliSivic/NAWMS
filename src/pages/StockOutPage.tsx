@@ -1,9 +1,9 @@
 import React, { useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { mockPackages } from '@/data/mockData';
-import { CheckCircle, ArrowRight, ScanLine, Shield, Package, Clock, AlertTriangle } from 'lucide-react';
+import { CheckCircle, ArrowRight, ScanLine, Package, Clock, AlertTriangle } from 'lucide-react';
 
-const steps = ['Request Details', 'System Selection (FIFO)', 'Submit for Approval', 'Outbound Verification'];
+const steps = ['Request Details', 'System Selection (FIFO)', 'Confirm & Dispatch', 'Outbound Verification'];
 
 const StockOutPage: React.FC = () => {
   const [step, setStep] = useState(0);
@@ -63,7 +63,7 @@ const StockOutPage: React.FC = () => {
     <div className="space-y-6 max-w-4xl">
       <div>
         <h1 className="text-xl font-semibold">Stock Out — Process Outbound Request</h1>
-        <p className="text-sm text-muted-foreground">Controlled stock-out with FIFO selection and supervisor approval</p>
+        <p className="text-sm text-muted-foreground">Controlled stock-out with FIFO selection</p>
       </div>
 
       {/* Steps */}
@@ -180,34 +180,33 @@ const StockOutPage: React.FC = () => {
 
             <div className="flex justify-between">
               <Button size="sm" variant="outline" onClick={() => setStep(0)}>Back</Button>
-              <Button size="sm" onClick={() => setStep(2)}>Submit for Approval <Shield className="w-3 h-3 ml-1" /></Button>
+              <Button size="sm" onClick={() => setStep(2)}>Confirm Selection <ArrowRight className="w-3 h-3 ml-1" /></Button>
             </div>
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-4">
-            <h2 className="text-sm font-medium">Approval Status</h2>
+            <h2 className="text-sm font-medium">Confirm & Dispatch</h2>
             {!submitted ? (
               <>
-                <div className="p-4 bg-amber-50 border border-warning/20 rounded text-xs">
-                  <p className="font-medium text-warning">Supervisor Approval Required</p>
-                  <p className="text-muted-foreground mt-1">This stock-out request for {selectedPkgs.length} packages (USD {totalSelectedValue.toLocaleString()}) requires supervisor authorization before retrieval can begin.</p>
+                <div className="p-3 bg-muted rounded text-xs space-y-1">
+                  <div className="flex justify-between"><span className="text-muted-foreground">Packages</span><span className="font-medium">{selectedPkgs.length}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Total Value</span><span className="font-medium">USD {totalSelectedValue.toLocaleString()}</span></div>
                 </div>
-                <Button size="sm" onClick={() => setSubmitted(true)}>Submit Request</Button>
+                <Button size="sm" onClick={() => setSubmitted(true)}>Confirm & Create Retrieval Tasks</Button>
               </>
             ) : (
               <div className="space-y-3 animate-fade-in">
                 <div className="p-4 bg-green-50 border border-success/20 rounded">
-                  <p className="text-sm font-medium text-success">Request Submitted</p>
-                  <p className="text-xs text-muted-foreground mt-1">Approval request APR-006 sent to Supervisor. Robot retrieval tasks will be created upon approval.</p>
+                  <p className="text-sm font-medium text-success">Retrieval Tasks Created</p>
+                  <p className="text-xs text-muted-foreground mt-1">Robot retrieval tasks have been dispatched for {selectedPkgs.length} packages.</p>
                 </div>
                 <div className="p-3 bg-muted rounded text-xs space-y-1">
                   <div className="flex justify-between"><span className="text-muted-foreground">Request ID</span><span className="font-mono">APR-006</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="text-warning font-medium">Pending Approval</span></div>
-                  <div className="flex justify-between"><span className="text-muted-foreground">Submitted</span><span>{new Date().toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="text-success font-medium">Dispatched</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Created</span><span>{new Date().toLocaleString()}</span></div>
                 </div>
-                <p className="text-xs text-muted-foreground italic">Demo mode: Simulating supervisor approval to proceed to verification step.</p>
                 <Button size="sm" onClick={() => setStep(3)}>Proceed to Verification <ArrowRight className="w-3 h-3 ml-1" /></Button>
               </div>
             )}

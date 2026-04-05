@@ -12,6 +12,15 @@ const WarehouseMapPage: React.FC = () => {
     : null;
   const zone = selectedSlot ? mockZones.find(z => z.zoneId === selectedSlot.zoneId) : null;
   const palletPkgs = pallet ? mockPackages.filter(p => p.palletId === pallet.palletId) : [];
+  const slotStatus = !pallet
+    ? { label: 'No Pallet', className: 'text-muted-foreground' }
+    : pallet.status === 'maintenance'
+      ? { label: 'Maintenance', className: 'text-destructive' }
+      : pallet.currentPackageCount === 0
+        ? { label: 'Empty Pallet', className: 'text-warning' }
+        : pallet.status === 'in-transit'
+          ? { label: 'In Transit', className: 'text-info' }
+          : { label: 'Loaded', className: 'text-info' };
 
   return (
     <div className="flex gap-3 overflow-hidden" style={{ height: 'calc(100vh - 6.5rem)' }}>
@@ -109,7 +118,7 @@ const WarehouseMapPage: React.FC = () => {
             <div className="flex justify-between"><span className="text-muted-foreground">Zone</span><span>{zone?.zoneName ?? selectedSlot.zoneId}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Tier / Slot</span><span className="capitalize">{selectedSlot.tier} — {selectedSlot.slot}</span></div>
             <div className="flex justify-between"><span className="text-muted-foreground">Status</span>
-              <span className={selectedSlot.palletId ? 'text-info' : 'text-success'}>{selectedSlot.palletId ? 'Occupied' : 'Available'}</span>
+              <span className={slotStatus.className}>{slotStatus.label}</span>
             </div>
           </div>
 

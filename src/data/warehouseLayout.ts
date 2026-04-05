@@ -10,12 +10,13 @@ import { mockPallets, mockShelfLocations } from './mockData';
  *  │                                                      │
  *  │   ┌─────────────────────────────────────────────┐    │
  *  │   │            ZONE A (High Value)              │    │
- *  │   │  [S01] [S02] [S03] [S04]                    │    │
+ *  │   │  [S01] [S02] [S03] [S04] [S05] [S06]       │    │
  *  │   └─────────────────────────────────────────────┘    │
  *  │                   ═══ AISLE ═══                       │
  *  │   ┌─────────────────────────────────────────────┐    │
- *  │   │            ZONE B (Medium Value)            │    │
+ *  │   │        ZONE B (Medium Value)                │    │
  *  │   │  [S01] [S02] [S03] [S04] [S05] [S06]       │    │
+ *  │   │  [S07] [S08]                                │    │
  *  │   └─────────────────────────────────────────────┘    │
  *  │                   ═══ AISLE ═══                       │
  *  │   ┌──────────────────────┐ ┌────────────────────┐    │
@@ -82,8 +83,8 @@ const ZONE_B = { x: 4, y: 11, w: 52, h: 5 };
 const ZONE_C = { x: 4, y: 19, w: 27, h: 7 };
 const ZONE_D = { x: 33, y: 19, w: 23, h: 7 };
 
-const shelvesA = buildShelves('ZONE-A', 'A', 4, ZONE_A.x + ZONE_SIDE_PADDING, ZONE_A.y + ZONE_TOP_PADDING);
-const shelvesB = buildShelves('ZONE-B', 'B', 6, ZONE_B.x + ZONE_SIDE_PADDING, ZONE_B.y + ZONE_TOP_PADDING);
+const shelvesA = buildShelves('ZONE-A', 'A', 6, ZONE_A.x + ZONE_SIDE_PADDING, ZONE_A.y + ZONE_TOP_PADDING);
+const shelvesB = buildShelves('ZONE-B', 'B', 8, ZONE_B.x + ZONE_SIDE_PADDING, ZONE_B.y + ZONE_TOP_PADDING);
 const shelvesC = buildShelves('ZONE-C', 'C', 4, ZONE_C.x + ZONE_SIDE_PADDING, ZONE_C.y + ZONE_TOP_PADDING);
 const shelvesD = buildShelves('ZONE-D', 'D', 3, ZONE_D.x + ZONE_SIDE_PADDING, ZONE_D.y + ZONE_TOP_PADDING);
 

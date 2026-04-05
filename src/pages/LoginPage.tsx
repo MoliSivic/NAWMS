@@ -6,10 +6,8 @@ import { LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const roles: { role: UserRole; label: string; desc: string }[] = [
-  { role: 'admin', label: 'Administrator', desc: 'Full system access, configuration, user management' },
+  { role: 'admin', label: 'Administrator', desc: 'Full system access, configuration, approvals, robot management' },
   { role: 'operator', label: 'Operator', desc: 'Stock in/out, scanning, warehouse operations' },
-  { role: 'supervisor', label: 'Supervisor', desc: 'Approvals, review, reports oversight' },
-  { role: 'technician', label: 'Robot Technician', desc: 'Robot monitoring, maintenance, diagnostics' },
 ];
 
 const LoginPage: React.FC = () => {
