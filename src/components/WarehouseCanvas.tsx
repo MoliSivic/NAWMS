@@ -2,6 +2,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { warehouseLayout, findRoute, locationToWaypointId } from '@/data/warehouseLayout';
 import { mockRobots, mockTasks, mockPallets, mockZones } from '@/data/mockData';
 import type { Robot, RobotTask, RouteWaypoint } from '@/data/types';
+import { useTheme } from '@/contexts/ThemeContext';
 
 // ─── Types ───
 interface CanvasRobot extends Robot {
@@ -101,8 +102,67 @@ function robotColor(status: Robot['status']): string {
   }
 }
 
+// ─── Theme palette ───
+function getCanvasPalette(mode: 'light' | 'dark') {
+  if (mode === 'light') {
+    return {
+      bg: '#f1f5f9',
+      boundary: '#cbd5e1',
+      grid: 'rgba(148,163,184,0.2)',
+      zoneFillAlpha: '30',
+      zoneStrokeAlpha: '70',
+      zoneLabelBand: 'rgba(255,255,255,0.55)',
+      zoneLabelText: '#1e293b',
+      aisle: 'rgba(100,116,139,0.3)',
+      doorFill: '#fef3c766',
+      doorStroke: '#d97706',
+      doorText: '#92400e',
+      shelfBg: '#e2e8f0',
+      shelfBorder: '#94a3b8',
+      shelfLabel: '#475569',
+      slotEmpty: '#f8fafc',
+      slotHigh: '#16a34a',
+      slotMed: '#3b82f6',
+      slotLow: '#f59e0b',
+      slotCrit: '#ef4444',
+      slotSelected: '#2563eb',
+      robotStroke: '#fff',
+      robotLabel: '#fff',
+      batteryBg: '#cbd5e1',
+      scaleText: '#64748b',
+    };
+  }
+  return {
+    bg: '#0f1729',
+    boundary: '#334155',
+    grid: 'rgba(51,65,85,0.3)',
+    zoneFillAlpha: '40',
+    zoneStrokeAlpha: '99',
+    zoneLabelBand: 'rgba(15,23,42,0.35)',
+    zoneLabelText: '#e2e8f0',
+    aisle: 'rgba(148,163,184,0.25)',
+    doorFill: '#f59e0b44',
+    doorStroke: '#f59e0b',
+    doorText: '#fbbf24',
+    shelfBg: '#1e293b',
+    shelfBorder: '#475569',
+    shelfLabel: '#94a3b8',
+    slotEmpty: '#0f172a',
+    slotHigh: '#166534',
+    slotMed: '#1e40af',
+    slotLow: '#92400e',
+    slotCrit: '#7f1d1d',
+    slotSelected: '#60a5fa',
+    robotStroke: '#fff',
+    robotLabel: '#fff',
+    batteryBg: '#334155',
+    scaleText: '#94a3b8',
+  };
+}
+
 // ─── Component ───
 const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selectedSlotId, className }) => {
+  const { theme } = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrame = useRef<number>(0);
@@ -122,15 +182,27 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
     );
   }, [canvasSize, layout]);
 
-  const toCanvasX = useCallback((mx: number) => PADDING + mx * pxPerM(), [pxPerM]);
-  const toCanvasY = useCallback((my: number) => PADDING + my * pxPerM(), [pxPerM]);
+  // Center the warehouse drawing within the canvas
+  const offsetX = useCallback(() => {
+    const s = pxPerM();
+    return (canvasSize.w - layout.width * s) / 2;
+  }, [canvasSize, pxPerM, layout]);
+
+  const offsetY = useCallback(() => {
+    const s = pxPerM();
+    return (canvasSize.h - layout.height * s) / 2;
+  }, [canvasSize, pxPerM, layout]);
+
+  const toCanvasX = useCallback((mx: number) => offsetX() + mx * pxPerM(), [pxPerM, offsetX]);
+  const toCanvasY = useCallback((my: number) => offsetY() + my * pxPerM(), [pxPerM, offsetY]);
 
   // ─── Initialize robots with routes ───
   useEffect(() => {
     const activeTask = (rid: string): RobotTask | undefined =>
       mockTasks.find(t => t.robotId === rid && t.status === 'in-progress');
+    const activeRobots = mockRobots.filter(r => r.status === 'active');
 
-    robotsRef.current = mockRobots.map(r => {
+    robotsRef.current = activeRobots.map(r => {
       const pos = initRobotPos(r);
       const task = activeTask(r.robotId);
       let route: RouteWaypoint[] = [];
@@ -235,10 +307,11 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
 
     animFrame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animFrame.current);
-  }, [canvasSize, pxPerM, selectedSlotId]);
+  }, [canvasSize, pxPerM, selectedSlotId, theme]);
 
   // ─── Draw function ───
   function draw(ctx: CanvasRenderingContext2D, s: number) {
+    const p = getCanvasPalette(theme);
     const { w, h } = canvasSize;
     const dpr = window.devicePixelRatio || 1;
     const canvas = ctx.canvas;
@@ -249,16 +322,16 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Background
-    ctx.fillStyle = '#0f1729';
+    ctx.fillStyle = p.bg;
     ctx.fillRect(0, 0, w, h);
 
     // Warehouse boundary
-    ctx.strokeStyle = '#334155';
+    ctx.strokeStyle = p.boundary;
     ctx.lineWidth = 2;
     ctx.strokeRect(toCanvasX(0), toCanvasY(0), layout.width * s, layout.height * s);
 
-    // Grid lines (light)
-    ctx.strokeStyle = 'rgba(51,65,85,0.3)';
+    // Grid lines
+    ctx.strokeStyle = p.grid;
     ctx.lineWidth = 0.5;
     for (let mx = 0; mx <= layout.width; mx += 5) {
       ctx.beginPath();
@@ -283,18 +356,17 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
       const fullLabel = zone.label;
       const shortLabel = zone.label.split('—')[0].trim();
 
-      ctx.fillStyle = zone.color + '40'; // semi-transparent
+      ctx.fillStyle = zone.color + p.zoneFillAlpha;
       ctx.fillRect(zoneX, zoneY, zoneW, zoneH);
-      ctx.strokeStyle = zone.color + '99';
+      ctx.strokeStyle = zone.color + p.zoneStrokeAlpha;
       ctx.lineWidth = 1.5;
       ctx.strokeRect(zoneX, zoneY, zoneW, zoneH);
 
-      // Reserve a slim header strip so zone titles stay clear of the shelves.
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.35)';
+      ctx.fillStyle = p.zoneLabelBand;
       ctx.fillRect(zoneX, zoneY, zoneW, labelBandH);
 
       ctx.save();
-      ctx.fillStyle = '#e2e8f0';
+      ctx.fillStyle = p.zoneLabelText;
       ctx.font = `600 ${Math.max(10, s * 0.8)}px sans-serif`;
       const labelMaxW = zoneW - 16;
       const label = ctx.measureText(fullLabel).width <= labelMaxW ? fullLabel : shortLabel;
@@ -305,7 +377,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
     }
 
     // Aisles
-    ctx.strokeStyle = 'rgba(148,163,184,0.25)';
+    ctx.strokeStyle = p.aisle;
     ctx.lineWidth = Math.max(2, s * 0.6);
     ctx.setLineDash([6, 4]);
     for (const a of layout.aisles) {
@@ -318,12 +390,12 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
 
     // Door
     const door = layout.door;
-    ctx.fillStyle = '#f59e0b44';
+    ctx.fillStyle = p.doorFill;
     ctx.fillRect(toCanvasX(door.x), toCanvasY(door.y), door.width * s, door.height * s);
-    ctx.strokeStyle = '#f59e0b';
+    ctx.strokeStyle = p.doorStroke;
     ctx.lineWidth = 2;
     ctx.strokeRect(toCanvasX(door.x), toCanvasY(door.y), door.width * s, door.height * s);
-    ctx.fillStyle = '#fbbf24';
+    ctx.fillStyle = p.doorText;
     ctx.font = `bold ${Math.max(10, s * 1)}px sans-serif`;
     ctx.fillText('DOOR (In/Out)', toCanvasX(door.x) + 4, toCanvasY(door.y) + door.height * s / 2 + 4);
 
@@ -336,21 +408,21 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
       const sh = shelf.height * s;
 
       // Shelf background
-      ctx.fillStyle = '#1e293b';
+      ctx.fillStyle = p.shelfBg;
       ctx.fillRect(sx, sy, sw, sh);
-      ctx.strokeStyle = '#475569';
+      ctx.strokeStyle = p.shelfBorder;
       ctx.lineWidth = 1;
       ctx.strokeRect(sx, sy, sw, sh);
 
       // Shelf label
-      ctx.fillStyle = '#94a3b8';
+      ctx.fillStyle = p.shelfLabel;
       ctx.font = `${Math.max(8, s * 0.7)}px monospace`;
       ctx.fillText(shelf.shelfId, sx + 2, sy + Math.max(10, s * 0.9));
 
       // Draw 4 slots (2×2 grid inside shelf)
       const slotPad = 2;
       const slotW = (sw - slotPad * 3) / 2;
-      const slotH = (sh - slotPad * 3 - Math.max(10, s * 0.9)) / 2; // leave room for label
+      const slotH = (sh - slotPad * 3 - Math.max(10, s * 0.9)) / 2;
       const slotStartY = sy + Math.max(12, s * 1.1);
 
       for (const slot of shelf.slots) {
@@ -360,19 +432,19 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
         const ry = slotStartY + row * (slotH + slotPad);
 
         // Occupancy color
-        let fill = '#0f172a'; // empty
+        let fill = p.slotEmpty;
         if (slot.palletId) {
-          if (slot.occupancy >= 0.9) fill = '#166534';
-          else if (slot.occupancy >= 0.5) fill = '#1e40af';
-          else if (slot.occupancy >= 0.25) fill = '#92400e';
-          else fill = '#7f1d1d';
+          if (slot.occupancy >= 0.9) fill = p.slotHigh;
+          else if (slot.occupancy >= 0.5) fill = p.slotMed;
+          else if (slot.occupancy >= 0.25) fill = p.slotLow;
+          else fill = p.slotCrit;
         }
 
         const isSelected = selectedSlotId === slot.locationId;
         ctx.fillStyle = fill;
         ctx.fillRect(rx, ry, slotW, slotH);
         if (isSelected) {
-          ctx.strokeStyle = '#60a5fa';
+          ctx.strokeStyle = p.slotSelected;
           ctx.lineWidth = 2;
           ctx.strokeRect(rx - 1, ry - 1, slotW + 2, slotH + 2);
         }
@@ -427,12 +499,12 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
       ctx.beginPath();
       ctx.arc(cx, cy, robotRadius, 0, Math.PI * 2);
       ctx.fill();
-      ctx.strokeStyle = '#fff';
+      ctx.strokeStyle = p.robotStroke;
       ctx.lineWidth = 1.5;
       ctx.stroke();
 
       // Label
-      ctx.fillStyle = '#fff';
+      ctx.fillStyle = p.robotLabel;
       ctx.font = `bold ${Math.max(8, s * 0.65)}px sans-serif`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -445,16 +517,16 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({ onSlotClick, selected
       const barH = 3;
       const barX = cx - robotRadius;
       const barY = cy + robotRadius + 3;
-      ctx.fillStyle = '#334155';
+      ctx.fillStyle = p.batteryBg;
       ctx.fillRect(barX, barY, barW, barH);
       ctx.fillStyle = rb.batteryLevel > 30 ? '#22c55e' : rb.batteryLevel > 15 ? '#f59e0b' : '#ef4444';
       ctx.fillRect(barX, barY, barW * (rb.batteryLevel / 100), barH);
     }
 
     // Scale indicator
-    ctx.fillStyle = '#94a3b8';
+    ctx.fillStyle = p.scaleText;
     ctx.font = '10px sans-serif';
-    ctx.fillText(`Scale: 1px = ${(1 / s).toFixed(2)}m | ${layout.width}m × ${layout.height}m`, PADDING, canvasSize.h - 6);
+    ctx.fillText(`Scale: 1px = ${(1 / s).toFixed(2)}m | ${layout.width}m × ${layout.height}m`, offsetX(), canvasSize.h - 6);
   }
 
   // ─── Click handler ───

@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { Outlet } from 'react-router-dom';
 import AppSidebar from '@/components/AppSidebar';
 import { useAuth } from '@/contexts/AuthContext';
-import { Bell, Search } from 'lucide-react';
+import { Bell, Search, Sun, Moon } from 'lucide-react';
 import { mockAlerts } from '@/data/mockData';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const AppLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(false);
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const unackAlerts = mockAlerts.filter(a => !a.acknowledged).length;
 
   return (
@@ -27,6 +29,13 @@ const AppLayout: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={toggleTheme}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}
+            >
+              {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
+            </button>
             <div className="relative">
               <Bell className="w-4 h-4 text-muted-foreground cursor-pointer hover:text-foreground transition-colors" />
               {unackAlerts > 0 && (
