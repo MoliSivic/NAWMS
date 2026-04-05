@@ -41,11 +41,11 @@ const AuthGate: React.FC = () => {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/stock-in" element={<RoleGuard roles={['admin', 'operator']}><StockInPage /></RoleGuard>} />
         <Route path="/stock-out" element={<RoleGuard roles={['admin', 'operator']}><StockOutPage /></RoleGuard>} />
-        <Route path="/warehouse-map" element={<RoleGuard roles={['admin', 'operator', 'supervisor']}><WarehouseMapPage /></RoleGuard>} />
+        <Route path="/warehouse-map" element={<RoleGuard roles={['admin', 'operator', 'supervisor', 'technician']}><WarehouseMapPage /></RoleGuard>} />
         <Route path="/shelf-3d" element={<RoleGuard roles={['admin', 'operator', 'supervisor']}><Shelf3DPage /></RoleGuard>} />
         <Route path="/inventory" element={<RoleGuard roles={['admin', 'operator', 'supervisor']}><InventoryPage /></RoleGuard>} />
         <Route path="/pallets" element={<RoleGuard roles={['admin', 'operator', 'supervisor']}><PalletPage /></RoleGuard>} />
-        <Route path="/robots" element={<RoleGuard roles={['admin', 'technician', 'operator']}><RobotMonitorPage /></RoleGuard>} />
+        <Route path="/robots" element={<RoleGuard roles={['admin', 'technician']}><RobotMonitorPage /></RoleGuard>} />
         <Route path="/optimization" element={<RoleGuard roles={['admin', 'supervisor']}><OptimizationPage /></RoleGuard>} />
         <Route path="/approvals" element={<RoleGuard roles={['admin', 'supervisor']}><ApprovalPage /></RoleGuard>} />
         <Route path="/audit" element={<RoleGuard roles={['admin', 'supervisor']}><AuditPage /></RoleGuard>} />

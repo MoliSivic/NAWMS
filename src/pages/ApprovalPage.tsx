@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { mockApprovals, mockUsers } from '@/data/mockData';
 import { Button } from '@/components/ui/button';
-import { Check, X, Shield } from 'lucide-react';
+import { Check, X, Shield, Clock } from 'lucide-react';
 
 const ApprovalPage: React.FC = () => {
   const [approvals, setApprovals] = useState(mockApprovals);
@@ -69,6 +69,15 @@ const ApprovalPage: React.FC = () => {
                   <div className="p-2 bg-muted rounded"><span className="text-muted-foreground">Space Saved</span><p className="font-medium mt-0.5">{String((a.details as Record<string, unknown>).spaceSaved)}</p></div>
                 )}
               </div>
+
+              {/* FIFO compliance */}
+              {a.type === 'stock-out' && (
+                <div className="flex items-center gap-2 mb-3 px-2 py-1.5 bg-green-50 rounded text-[10px]">
+                  <Clock className="w-3 h-3 text-success" />
+                  <span className="font-medium text-success">FIFO Compliant</span>
+                  <span className="text-muted-foreground">— Packages selected in arrival-date order (oldest first)</span>
+                </div>
+              )}
 
               {/* Reviewed info */}
               {a.status !== 'pending' && a.reviewedBy && (

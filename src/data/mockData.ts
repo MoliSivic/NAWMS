@@ -1,4 +1,4 @@
-import type { User, MoneyPackage, DenominationLine, Pallet, Zone, ShelfLocation, Robot, RobotTask, Approval, AuditLog, OptimizationSuggestion, Alert } from './types';
+import type { User, MoneyPackage, DenominationLine, Pallet, Zone, ShelfLocation, Robot, RobotTask, Approval, AuditLog, OptimizationSuggestion, Alert, StockMovement } from './types';
 
 // ─── Users ───
 export const mockUsers: User[] = [
@@ -14,7 +14,7 @@ export const mockUsers: User[] = [
 export const mockZones: Zone[] = [
   { zoneId: 'ZONE-A', zoneName: 'Zone A — High Value', securityClass: 'high', maxCapacity: 8, allowedTypes: 'USD, High-Value KHR', shelfCount: 4, color: '#1e3a5f' },
   { zoneId: 'ZONE-B', zoneName: 'Zone B — Medium Value', securityClass: 'medium', maxCapacity: 12, allowedTypes: 'KHR Standard', shelfCount: 6, color: '#2d5a87' },
-  { zoneId: 'ZONE-C', zoneName: 'Zone C — Low Value', securityClass: 'low', maxCapacity: 10, allowedTypes: 'KHR Low Denomination', shelfCount: 5, color: '#4a7fb5' },
+  { zoneId: 'ZONE-C', zoneName: 'Zone C — Low Value', securityClass: 'low', maxCapacity: 8, allowedTypes: 'KHR Low Denomination', shelfCount: 4, color: '#4a7fb5' },
   { zoneId: 'ZONE-D', zoneName: 'Zone D — Mixed', securityClass: 'mixed', maxCapacity: 6, allowedTypes: 'Mixed Currency', shelfCount: 3, color: '#6b9fd4' },
 ];
 
@@ -27,6 +27,7 @@ function denom(currency: string, denomination: number, quantity: number): Denomi
 const pkgBase = (id: number, denoms: DenominationLine[], palletId: string, loc: string, status: MoneyPackage['status'], security: MoneyPackage['securityLevel'], date: string): MoneyPackage => ({
   packageId: `PKG-${String(id).padStart(5, '0')}`,
   qrCode: `QR-${String(id).padStart(5, '0')}-NBC`,
+  productType: 'Money',
   denominations: denoms,
   totalValue: denoms.reduce((s, d) => s + d.subtotal, 0),
   currency: denoms[0].currency,
@@ -34,10 +35,13 @@ const pkgBase = (id: number, denoms: DenominationLine[], palletId: string, loc: 
   locationCode: loc,
   status,
   securityLevel: security,
+  sealStatus: 'sealed',
   source: ['Central Treasury', 'Branch Office Phnom Penh', 'Ministry of Finance', 'Provincial Branch'][id % 4],
   arrivalDate: date,
+  releasedDate: status === 'released' ? date : null,
   registeredBy: 'USR-002',
   createdAt: date,
+  notes: '',
 });
 
 export const mockPackages: MoneyPackage[] = [
@@ -103,7 +107,7 @@ export const mockPallets: Pallet[] = [
 // ─── Shelf Locations ───
 export const mockShelfLocations: ShelfLocation[] = [];
 const zones = ['A', 'B', 'C', 'D'];
-const shelvesPerZone = [4, 6, 5, 3];
+const shelvesPerZone = [4, 6, 4, 3];
 zones.forEach((z, zi) => {
   for (let s = 1; s <= shelvesPerZone[zi]; s++) {
     for (const tier of ['top', 'bottom'] as const) {
@@ -182,6 +186,15 @@ export const mockAlerts: Alert[] = [
   { id: 'ALR-003', type: 'warning', title: 'ROB-003 Temperature Warning', message: 'Internal temperature at 55°C exceeds threshold of 50°C.', source: 'ROB-003', timestamp: '2026-04-02T07:28:00Z', acknowledged: true },
   { id: 'ALR-004', type: 'info', title: 'End-of-Day Optimization Ready', message: '4 optimization suggestions generated. Supervisor review required.', source: 'System', timestamp: '2026-04-01T23:01:00Z', acknowledged: false },
   { id: 'ALR-005', type: 'warning', title: 'Pallet PAL-011 Overdue Maintenance', message: 'PAL-011 has been in maintenance for 5 days — exceeds normal 3-day threshold.', source: 'System', timestamp: '2026-04-02T06:00:00Z', acknowledged: false },
+];
+
+// ─── Stock Movements ───
+export const mockStockMovements: StockMovement[] = [
+  { movementId: 1, packageId: 'PKG-00156', fromPallet: '', toPallet: 'PAL-008', fromLocation: 'Inbound Area', toLocation: 'A-02-B-P1', movementType: 'stock-in', taskId: 'TSK-00001', performedBy: 'USR-002', approvedBy: null, timestamp: '2026-04-02T08:30:00Z' },
+  { movementId: 2, packageId: 'PKG-00050', fromPallet: 'PAL-003', toPallet: '', fromLocation: 'B-02-B-P1', toLocation: 'Outbound Area', movementType: 'stock-out', taskId: 'TSK-00005', performedBy: 'USR-003', approvedBy: 'USR-004', timestamp: '2026-04-01T16:15:00Z' },
+  { movementId: 3, packageId: 'PKG-00001', fromPallet: 'PAL-001', toPallet: 'PAL-001', fromLocation: 'Inbound Area', toLocation: 'A-01-T-P1', movementType: 'stock-in', taskId: 'TSK-00003', performedBy: 'USR-002', approvedBy: null, timestamp: '2026-04-01T14:08:00Z' },
+  { movementId: 4, packageId: 'PKG-00041', fromPallet: 'PAL-003', toPallet: 'PAL-003', fromLocation: 'Inbound Area', toLocation: 'B-02-B-P1', movementType: 'stock-in', taskId: null, performedBy: 'USR-002', approvedBy: null, timestamp: '2026-03-20T11:00:00Z' },
+  { movementId: 5, packageId: 'PKG-00157', fromPallet: '', toPallet: 'PAL-008', fromLocation: 'Inbound Area', toLocation: 'A-02-B-P1', movementType: 'stock-in', taskId: 'TSK-00001', performedBy: 'USR-002', approvedBy: null, timestamp: '2026-04-02T08:35:00Z' },
 ];
 
 // ─── Dashboard Stats ───

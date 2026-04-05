@@ -60,7 +60,20 @@ const InventoryPage: React.FC = () => {
           {detail ? (
             <div className="space-y-3 text-xs animate-fade-in">
               <div className="space-y-2 p-3 bg-muted rounded">
-                {Object.entries({ 'Package ID': detail.packageId, 'QR Code': detail.qrCode, 'Pallet': detail.palletId, 'Location': detail.locationCode, 'Security': detail.securityLevel, 'Source': detail.source, 'Status': detail.status, 'Arrival': new Date(detail.arrivalDate).toLocaleDateString() }).map(([k, v]) => (
+                {Object.entries({
+                  'Package ID': detail.packageId,
+                  'QR Code': detail.qrCode,
+                  'Product Type': detail.productType,
+                  'Pallet': detail.palletId,
+                  'Location': detail.locationCode,
+                  'Security': detail.securityLevel,
+                  'Seal Status': detail.sealStatus,
+                  'Source': detail.source,
+                  'Status': detail.status,
+                  'Arrival': new Date(detail.arrivalDate).toLocaleDateString(),
+                  ...(detail.releasedDate ? { 'Released': new Date(detail.releasedDate).toLocaleDateString() } : {}),
+                  ...(detail.notes ? { 'Notes': detail.notes } : {}),
+                }).map(([k, v]) => (
                   <div key={k} className="flex justify-between"><span className="text-muted-foreground">{k}</span><span className="font-medium capitalize">{v}</span></div>
                 ))}
               </div>

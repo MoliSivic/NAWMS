@@ -18,12 +18,14 @@ export interface DenominationLine {
   subtotal: number;
 }
 
-export type PackageStatus = 'registered' | 'stored' | 'in-transit' | 'outbound' | 'released';
+export type PackageStatus = 'registered' | 'stored' | 'in-transit' | 'outbound' | 'released' | 'discarded';
 export type SecurityLevel = 'high' | 'medium' | 'low';
+export type SealStatus = 'sealed' | 'opened' | 'damaged';
 
 export interface MoneyPackage {
   packageId: string;
   qrCode: string;
+  productType: string;
   denominations: DenominationLine[];
   totalValue: number;
   currency: string;
@@ -31,10 +33,13 @@ export interface MoneyPackage {
   locationCode: string;
   status: PackageStatus;
   securityLevel: SecurityLevel;
+  sealStatus: SealStatus;
   source: string;
   arrivalDate: string;
+  releasedDate: string | null;
   registeredBy: string;
   createdAt: string;
+  notes: string;
 }
 
 export type PalletStatus = 'available' | 'in-use' | 'in-transit' | 'maintenance';
@@ -157,6 +162,66 @@ export interface OptimizationSuggestion {
   estimatedTravelReduction: string;
   status: 'pending' | 'approved' | 'rejected';
   createdAt: string;
+}
+
+export interface StockMovement {
+  movementId: number;
+  packageId: string;
+  fromPallet: string;
+  toPallet: string;
+  fromLocation: string;
+  toLocation: string;
+  movementType: 'stock-in' | 'stock-out' | 'reorganization';
+  taskId: string | null;
+  performedBy: string;
+  approvedBy: string | null;
+  timestamp: string;
+}
+
+// ─── Warehouse Layout (2D Map) ───
+export interface WarehouseLayoutConfig {
+  width: number;    // meters
+  height: number;   // meters
+  door: { x: number; y: number; width: number; height: number };
+  zones: WarehouseZoneRect[];
+  shelves: WarehouseShelf[];
+  aisles: { x1: number; y1: number; x2: number; y2: number }[];
+  routeWaypoints: RouteWaypoint[];
+  routeEdges: { from: string; to: string }[];
+}
+
+export interface WarehouseZoneRect {
+  zoneId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  color: string;
+  label: string;
+}
+
+export interface WarehouseShelf {
+  shelfId: string;      // e.g. "A-01"
+  zoneId: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  slots: WarehouseSlot[];
+}
+
+export interface WarehouseSlot {
+  locationId: string;   // e.g. "A-01-T-P1"
+  tier: 'top' | 'bottom';
+  slot: 'P1' | 'P2';
+  palletId: string | null;
+  occupancy: number;    // 0-1
+}
+
+export interface RouteWaypoint {
+  id: string;
+  x: number;
+  y: number;
 }
 
 export interface Alert {

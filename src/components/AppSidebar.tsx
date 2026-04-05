@@ -20,15 +20,15 @@ const navItems: NavItem[] = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'operator', 'supervisor', 'technician'] },
   { path: '/stock-in', label: 'Stock In', icon: PackagePlus, roles: ['admin', 'operator'] },
   { path: '/stock-out', label: 'Stock Out', icon: PackageMinus, roles: ['admin', 'operator'] },
-  { path: '/warehouse-map', label: 'Warehouse Map', icon: Map, roles: ['admin', 'operator', 'supervisor'] },
+  { path: '/warehouse-map', label: 'Warehouse Map', icon: Map, roles: ['admin', 'operator', 'supervisor', 'technician'] },
   { path: '/shelf-3d', label: '3D Shelf View', icon: Cuboid, roles: ['admin', 'operator', 'supervisor'] },
   { path: '/inventory', label: 'Inventory Registry', icon: Box, roles: ['admin', 'operator', 'supervisor'] },
   { path: '/pallets', label: 'Pallet Management', icon: Boxes, roles: ['admin', 'operator', 'supervisor'] },
-  { path: '/robots', label: 'Robot Monitoring', icon: Bot, roles: ['admin', 'technician', 'operator'] },
+  { path: '/robots', label: 'Robot Monitoring', icon: Bot, roles: ['admin', 'technician'] },
   { path: '/optimization', label: 'Optimization', icon: Lightbulb, roles: ['admin', 'supervisor'] },
   { path: '/approvals', label: 'Approval Queue', icon: ClipboardCheck, roles: ['admin', 'supervisor'] },
   { path: '/audit', label: 'Audit Log', icon: FileText, roles: ['admin', 'supervisor'] },
-  { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'supervisor'] },
+  { path: '/reports', label: 'Reports', icon: BarChart3, roles: ['admin', 'supervisor', 'technician'] },
   { path: '/settings', label: 'Settings', icon: Settings, roles: ['admin'] },
 ];
 
