@@ -21,6 +21,8 @@ interface CanvasRobot extends Robot {
   routeIdx: number;
   /** Direction: +1 forward, -1 backward (ping-pong along route) */
   routeDir: 1 | -1;
+  /** If true, the robot is following a live task and won't ping-pong */
+  isLive?: boolean;
 }
 
 interface SlotInfo {
@@ -40,10 +42,18 @@ interface PanOffset {
   y: number;
 }
 
+export interface LiveTask {
+  robotId: string;
+  sourceLocation: string;
+  targetLocation: string;
+  status: 'retrieving' | 'storing' | 'idle';
+}
+
 export interface WarehouseCanvasProps {
   onSlotClick?: (slot: SlotInfo | null) => void;
   selectedSlotId?: string | null;
   className?: string;
+  liveTask?: LiveTask | null;
 }
 
 // ─── Helpers ───
@@ -89,24 +99,23 @@ function syncTargetToRoute(robot: CanvasRobot) {
 function advanceRoute(robot: CanvasRobot) {
   if (robot.route.length < 2) return;
 
-  let nextIdx = robot.routeIdx + robot.routeDir;
-  if (nextIdx < 0 || nextIdx >= robot.route.length) {
-    robot.routeDir = robot.routeDir === 1 ? -1 : 1;
-    nextIdx = robot.routeIdx + robot.routeDir;
+  let nextIdx = robot.routeIdx + 1;
+  
+  // Stop at the end of the route
+  if (nextIdx >= robot.route.length) {
+    return; 
   }
 
-  robot.routeIdx = Math.max(0, Math.min(robot.route.length - 1, nextIdx));
+  robot.routeIdx = nextIdx;
   syncTargetToRoute(robot);
 }
 
 /** Map initial mock robot positions to valid aisle/corridor locations (warehouse meters) */
 function initRobotPos(r: Robot): { x: number; y: number } {
-  // ROB-001 active — on the aisle between A and B, near shelf A-02
-  if (r.robotId === "ROB-001") return { x: 14, y: 8.5 };
   // ROB-002 idle — on the corridor near the door
-  if (r.robotId === "ROB-002") return { x: 2, y: 32 };
-  // ROB-003 error — on the aisle below C/D, near Zone D
-  return { x: 37.5, y: 26.5 };
+  if (r.robotId === "ROB-002") return { x: 9, y: 36 };
+  // Default to door
+  return { x: 9, y: 36 };
 }
 
 function robotColor(status: Robot["status"]): string {
@@ -179,6 +188,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   onSlotClick,
   selectedSlotId,
   className,
+  liveTask,
 }) => {
   const controlPalette = getMapControlPalette();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -281,28 +291,62 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   useEffect(() => {
     const activeTask = (rid: string): RobotTask | undefined =>
       mockTasks.find((t) => t.robotId === rid && t.status === "in-progress");
-    const activeRobots = mockRobots.filter((r) => r.status === "active");
+    const activeRobots = mockRobots.filter((r) => r.status === "active" || r.status === "idle");
 
     robotsRef.current = activeRobots.map((r) => {
-      const pos = initRobotPos(r);
-      const task = activeTask(r.robotId);
-      let route: RouteWaypoint[] = [];
+      // Try to find the existing robot in the ref to preserve its position
+      const existing = robotsRef.current.find(ex => ex.robotId === r.robotId);
+      const pos = existing ? { x: existing.displayX, y: existing.displayY } : initRobotPos(r);
+      
+      let task = activeTask(r.robotId);
+      
+      // Override with liveTask if applicable
+      if (liveTask && liveTask.robotId === r.robotId) {
+        task = {
+          taskId: 'live',
+          taskType: liveTask.status === 'retrieving' ? 'retrieve' : 'store',
+          robotId: r.robotId,
+          palletId: 'temp',
+          sourceLocation: liveTask.sourceLocation,
+          targetLocation: liveTask.targetLocation,
+          status: 'in-progress',
+          createdBy: 'system',
+          approvedBy: null,
+          createdAt: '',
+          startedAt: '',
+          completedAt: null,
+          completionTimeSec: null
+        } as any;
+      }
+
+      // Only move if it has a task
+      if (!task) {
+        return {
+          ...r,
+          displayX: pos.x,
+          displayY: pos.y,
+          targetX: pos.x,
+          targetY: pos.y,
+          route: [],
+          routeIdx: 0,
+          routeDir: 1,
+          isLive: false,
+          status: r.status
+        };
+      }
+
+      const fromWp = locationToWaypointId(task.sourceLocation);
+      const toWp = locationToWaypointId(task.targetLocation);
+      const route = findRoute(fromWp, toWp);
       let routeIdx = 0;
-      let routeDir: 1 | -1 = 1;
       let targetX = pos.x;
       let targetY = pos.y;
 
-      if (task) {
-        const fromWp = locationToWaypointId(task.sourceLocation);
-        const toWp = locationToWaypointId(task.targetLocation);
-        route = findRoute(fromWp, toWp);
-
-        if (route.length > 0) {
-          routeIdx = nearestRouteIndex(route, pos.x, pos.y);
-          routeDir = routeIdx >= route.length - 1 ? -1 : 1;
-          targetX = route[routeIdx].x;
-          targetY = route[routeIdx].y;
-        }
+      if (route.length > 0) {
+        // If we preserved position, find the nearest index on the new route
+        routeIdx = nearestRouteIndex(route, pos.x, pos.y);
+        targetX = route[routeIdx].x;
+        targetY = route[routeIdx].y;
       }
 
       return {
@@ -313,10 +357,12 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
         targetY,
         route,
         routeIdx,
-        routeDir,
+        routeDir: 1,
+        isLive: liveTask?.robotId === r.robotId,
+        status: liveTask?.robotId === r.robotId && liveTask.status !== 'idle' ? 'active' : r.status
       };
     });
-  }, []);
+  }, [liveTask]);
 
   // ─── Resize observer ───
   useEffect(() => {
@@ -359,7 +405,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           continue;
 
         let remainingStep =
-          Math.max(MIN_ROUTE_SPEED, rb.currentSpeed * ROUTE_SPEED_FACTOR) *
+          Math.max(MIN_ROUTE_SPEED, (rb.currentSpeed || 1.2) * ROUTE_SPEED_FACTOR) *
           deltaSec;
         while (remainingStep > 0) {
           const distToTarget = distance(

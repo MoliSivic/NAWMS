@@ -121,8 +121,10 @@ const DashboardPage: React.FC = () => {
         {/* Operator extras */}
         {role === 'operator' && (
           <>
-            <StatCard icon={Bot} label="Active Robot Tasks" value={dashboardStats.activeRobotTasks} color="bg-navy-100 text-navy-600" />
             <StatCard icon={ClipboardCheck} label="Pending Approvals" value={dashboardStats.pendingApprovals} color="bg-orange-50 text-warning" />
+            <StatCard icon={TrendingUp} label="Tasks Completed" value={mockTasks.filter(t => t.status === 'completed').length} color="bg-green-50 text-success" sub="Last 7 days" />
+            <StatCard icon={Bot} label="Active Robot Tasks" value={dashboardStats.activeRobotTasks} color="bg-navy-100 text-navy-600" />
+            <StatCard icon={BatteryLow} label="Low Battery Alerts" value={dashboardStats.lowBatteryAlerts} color="bg-red-50 text-destructive" />
           </>
         )}
       </div>

@@ -224,7 +224,7 @@ const Shelf3DPage: React.FC = () => {
                 );
               })}
               <div className="pt-2 border-t text-muted-foreground">
-                Total capacity: 4 pallets × 40 packages = 160 packages
+                Total capacity: {['PAL-001', 'PAL-002', 'PAL-003', 'PAL-004'].reduce((sum, pid) => sum + (mockPallets.find(p => p.palletId === pid)?.maxCapacity || 0), 0)} packages across 4 pallets
               </div>
             </div>
           </div>

@@ -287,18 +287,12 @@ warehouseZoneLetters.forEach((z, zi) => {
 
 // ─── Robots ───
 export const mockRobots: Robot[] = [
-  { robotId: 'ROB-001', model: 'ForkMaster 3000', maxLoadKg: 500, batteryLevel: 78, currentSpeed: 1.2, currentLoadKg: 120, temperature: 42, locationX: 320, locationY: 150, status: 'active', errorCode: null, idleTimeSec: 0, commEndpoint: 'ws://robot-001.local:8080', lastMaintenance: '2026-03-20T10:00:00Z', totalTasksCompleted: 342 },
-  { robotId: 'ROB-002', model: 'ForkMaster 3000', maxLoadKg: 500, batteryLevel: 45, currentSpeed: 0, currentLoadKg: 0, temperature: 38, locationX: 100, locationY: 300, status: 'idle', errorCode: null, idleTimeSec: 1200, commEndpoint: 'ws://robot-002.local:8080', lastMaintenance: '2026-03-25T14:00:00Z', totalTasksCompleted: 218 },
-  { robotId: 'ROB-003', model: 'ForkMaster 5000X', maxLoadKg: 750, batteryLevel: 12, currentSpeed: 0, currentLoadKg: 0, temperature: 55, locationX: 450, locationY: 250, status: 'error', errorCode: 'ERR-BATT-LOW', idleTimeSec: 3600, commEndpoint: 'ws://robot-003.local:8080', lastMaintenance: '2026-02-28T09:00:00Z', totalTasksCompleted: 156 },
+  { robotId: 'ROB-002', model: 'ForkMaster 3000', maxLoadKg: 500, batteryLevel: 85, currentSpeed: 1.2, currentLoadKg: 0, temperature: 38, locationX: 100, locationY: 300, status: 'active', errorCode: null, idleTimeSec: 0, commEndpoint: 'ws://robot-002.local:8080', lastMaintenance: '2026-03-25T14:00:00Z', totalTasksCompleted: 218 },
 ];
 
 // ─── Robot Tasks ───
 export const mockTasks: RobotTask[] = [
-  { taskId: 'TSK-00001', taskType: 'store', robotId: 'ROB-001', palletId: 'PAL-008', sourceLocation: 'Inbound Area', targetLocation: 'A-02-B-P1', status: 'in-progress', createdBy: 'USR-002', approvedBy: null, createdAt: '2026-04-02T08:30:00Z', startedAt: '2026-04-02T08:32:00Z', completedAt: null, completionTimeSec: null },
-  { taskId: 'TSK-00002', taskType: 'retrieve', robotId: 'ROB-002', palletId: 'PAL-004', sourceLocation: 'B-02-T-P1', targetLocation: 'Outbound Area', status: 'queued', createdBy: 'USR-002', approvedBy: 'USR-001', createdAt: '2026-04-02T08:15:00Z', startedAt: null, completedAt: null, completionTimeSec: null },
-  { taskId: 'TSK-00003', taskType: 'store', robotId: 'ROB-001', palletId: 'PAL-001', sourceLocation: 'Inbound Area', targetLocation: 'A-01-T-P1', status: 'completed', createdBy: 'USR-002', approvedBy: null, createdAt: '2026-04-01T14:00:00Z', startedAt: '2026-04-01T14:02:00Z', completedAt: '2026-04-01T14:08:00Z', completionTimeSec: 360 },
-  { taskId: 'TSK-00004', taskType: 'reorganize', robotId: null, palletId: 'PAL-005', sourceLocation: 'C-01-B-P1', targetLocation: 'C-02-B-P1', status: 'queued', createdBy: 'USR-001', approvedBy: 'USR-001', createdAt: '2026-04-02T07:00:00Z', startedAt: null, completedAt: null, completionTimeSec: null },
-  { taskId: 'TSK-00005', taskType: 'retrieve', robotId: 'ROB-001', palletId: 'PAL-003', sourceLocation: 'B-02-B-P1', targetLocation: 'Outbound Area', status: 'completed', createdBy: 'USR-003', approvedBy: 'USR-001', createdAt: '2026-04-01T16:00:00Z', startedAt: '2026-04-01T16:05:00Z', completedAt: '2026-04-01T16:12:00Z', completionTimeSec: 420 },
+  { taskId: 'TSK-00001', taskType: 'store', robotId: 'ROB-002', palletId: 'PAL-008', sourceLocation: 'Inbound Area', targetLocation: 'A-02-B-P1', status: 'completed', createdBy: 'USR-002', approvedBy: null, createdAt: '2026-04-01T14:00:00Z', startedAt: '2026-04-01T14:02:00Z', completedAt: '2026-04-01T14:08:00Z', completionTimeSec: 360 },
 ];
 
 // ─── Approvals ───
