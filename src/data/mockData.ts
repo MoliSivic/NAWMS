@@ -10,10 +10,10 @@ export const mockUsers: User[] = [
 
 // ─── Zones ───
 export const mockZones: Zone[] = [
-  { zoneId: 'ZONE-A', zoneName: 'Zone A — High Value', securityClass: 'high', maxCapacity: 8, allowedTypes: 'USD, High-Value KHR', shelfCount: 6, color: '#1e3a5f' },
-  { zoneId: 'ZONE-B', zoneName: 'Zone B — Medium Value', securityClass: 'medium', maxCapacity: 12, allowedTypes: 'KHR Standard', shelfCount: 8, color: '#2d5a87' },
-  { zoneId: 'ZONE-C', zoneName: 'Zone C — Low Value', securityClass: 'low', maxCapacity: 8, allowedTypes: 'KHR Low Denomination', shelfCount: 4, color: '#4a7fb5' },
-  { zoneId: 'ZONE-D', zoneName: 'Zone D — Mixed', securityClass: 'mixed', maxCapacity: 6, allowedTypes: 'Mixed Currency', shelfCount: 3, color: '#6b9fd4' },
+  { zoneId: 'ZONE-A', zoneName: 'Zone A — High Value', securityClass: 'high', maxCapacity: 8, allowedTypes: '50000, 100000, 200000 KHR', shelfCount: 6, color: '#1e3a5f' },
+  { zoneId: 'ZONE-B', zoneName: 'Zone B — Medium Value', securityClass: 'medium', maxCapacity: 12, allowedTypes: '5000, 10000, 20000 KHR', shelfCount: 8, color: '#2d5a87' },
+  { zoneId: 'ZONE-C', zoneName: 'Zone C — Low Value', securityClass: 'low', maxCapacity: 8, allowedTypes: '500, 1000, 2000 KHR', shelfCount: 4, color: '#4a7fb5' },
+  { zoneId: 'ZONE-D', zoneName: 'Zone D — Mixed', securityClass: 'mixed', maxCapacity: 6, allowedTypes: '100, 200 KHR', shelfCount: 3, color: '#6b9fd4' },
 ];
 
 // Helper to create denomination lines
@@ -109,9 +109,7 @@ const warehouseRackSlots = [
 export const mockPackages: MoneyPackage[] = [
   // Pallet PAL-001 (Zone A, high value, 35 packages — nearly full)
   ...Array.from({ length: 35 }, (_, i) => pkgBase(i + 1,
-    i % 3 === 0 ? [denom('USD', 100, 500), denom('USD', 50, 200)] :
-    i % 3 === 1 ? [denom('USD', 100, 1000)] :
-    [denom('USD', 50, 400), denom('USD', 20, 300)],
+    [denom('KHR', 200000, 25)],
     'PAL-001', 'A-01-T-P1', 'stored', 'high', `2026-03-${String(15 + (i % 15)).padStart(2, '0')}T09:00:00Z`
   )),
   // Pallet PAL-002 (Zone A, 5 packages — nearly empty)

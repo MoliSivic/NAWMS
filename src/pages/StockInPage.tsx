@@ -49,22 +49,26 @@ const StockInPage: React.FC = () => {
 
   const totalValue = useMemo(() => valuePerSack * packageCount, [valuePerSack, packageCount]);
 
-  const khrDenoms = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 100];
+  const khrDenoms = [200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
 
   const availablePallets = useMemo(() => {
-    const securityToZone: Record<string, string[]> = {
-      high: ['ZONE-A'],
-      medium: ['ZONE-B', 'ZONE-D'],
-      low: ['ZONE-C', 'ZONE-D'],
-    };
-    const allowedZones = securityToZone[security] || [];
+    let allowedZones: string[] = [];
+    if ([50000, 100000, 200000].includes(singleDenom)) {
+      allowedZones = ['ZONE-A'];
+    } else if ([5000, 10000, 20000].includes(singleDenom)) {
+      allowedZones = ['ZONE-B'];
+    } else if ([500, 1000, 2000].includes(singleDenom)) {
+      allowedZones = ['ZONE-C'];
+    } else if ([100, 200].includes(singleDenom)) {
+      allowedZones = ['ZONE-D'];
+    }
     
     return mockPallets.filter(p => {
       const zoneMatch = allowedZones.includes(p.zoneId);
       const capacityMatch = p.currentPackageCount === 0; // Look for empty pallets for new assignment
       return p.status !== 'maintenance' && zoneMatch && capacityMatch;
     }).sort((a, b) => a.palletId.localeCompare(b.palletId));
-  }, [security]);
+  }, [singleDenom]);
 
   const selectedPallet = mockPallets.find(p => p.palletId === palletId);
   const suggestedPallet = availablePallets[0];
@@ -335,7 +339,12 @@ const StockInPage: React.FC = () => {
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-medium">Pallet & Rack Assignment</h2>
-              <div className="px-2 py-0.5 bg-success/10 text-success text-[10px] font-bold rounded uppercase">Zone {security.toUpperCase()} — Ready</div>
+              <div className="px-2 py-0.5 bg-success/10 text-success text-[10px] font-bold rounded uppercase">
+                {([50000, 100000, 200000].includes(singleDenom)) && 'Zone A — Ready'}
+                {([5000, 10000, 20000].includes(singleDenom)) && 'Zone B — Ready'}
+                {([500, 1000, 2000].includes(singleDenom)) && 'Zone C — Ready'}
+                {([100, 200].includes(singleDenom)) && 'Zone D — Ready'}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-4">
