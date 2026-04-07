@@ -198,7 +198,7 @@ const StockInPage: React.FC = () => {
       targetLocation: 'Inbound Area',
       status: 'idle'
     };
-  }, [step, robotStatus, suggestedLocation, countdown]);
+  }, [step, robotStatus, suggestedLocation, retrievalPhase]);
 
   return (
     <div className="min-h-[calc(100vh-120px)] flex flex-col items-center justify-start p-4 py-12">

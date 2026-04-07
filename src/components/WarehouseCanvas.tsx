@@ -197,6 +197,12 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const animFrame = useRef<number>(0);
+  const onLiveTaskArrivalRef = useRef(onLiveTaskArrival);
+  
+  useEffect(() => {
+    onLiveTaskArrivalRef.current = onLiveTaskArrival;
+  }, [onLiveTaskArrival]);
+
   const dragStateRef = useRef<{
     startX: number;
     startY: number;
@@ -431,7 +437,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
             ) {
               if (rb.isLive && rb.routeIdx === originalRouteIdx && !rb.hasArrived) {
                 rb.hasArrived = true;
-                if (onLiveTaskArrival) onLiveTaskArrival();
+                if (onLiveTaskArrivalRef.current) onLiveTaskArrivalRef.current();
               }
               break;
             }
