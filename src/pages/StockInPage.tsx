@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { mockPallets, mockShelfLocations, mockZones, mockPackages } from '@/data/mockData';
@@ -29,6 +30,7 @@ function useSessionState<T>(key: string, initialValue: T) {
 }
 
 const StockInPage: React.FC = () => {
+  const navigate = useNavigate();
   const [step, setStep] = useSessionState('nawms_si_step', 0);
   const mode = 'single';
   const currency = 'KHR';
@@ -243,21 +245,21 @@ const StockInPage: React.FC = () => {
   };
 
   const clearSessionAndReload = () => {
-    sessionStorage.removeItem('nawms_si_step');
-    sessionStorage.removeItem('nawms_si_denom');
-    sessionStorage.removeItem('nawms_si_valuePerSack');
-    sessionStorage.removeItem('nawms_si_packageCount');
-    sessionStorage.removeItem('nawms_si_source');
-    sessionStorage.removeItem('nawms_si_security');
-    sessionStorage.removeItem('nawms_si_palletId');
-    sessionStorage.removeItem('nawms_si_robotStatus');
-    sessionStorage.removeItem('nawms_si_retrievalPhase');
-    sessionStorage.removeItem('nawms_si_storingPhase');
-    sessionStorage.removeItem('nawms_si_isLabelAttached');
-    sessionStorage.removeItem('nawms_si_isPrinting');
-    sessionStorage.removeItem('nawms_si_countdown');
-    sessionStorage.removeItem('nawms_si_completedStockIns');
-    window.location.reload();
+    setStep(0);
+    setSingleDenom(100000);
+    setValuePerSack(100000000);
+    setPackageCount(40);
+    setSource('Central Treasury');
+    setSecurity('high');
+    setPalletId('');
+    setRobotStatus('idle');
+    setRetrievalPhase('idle');
+    setStoringPhase('idle');
+    setIsLabelAttached(false);
+    setIsPrinting(false);
+    setCountdown(null);
+    setCompletedStockIns([]);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCancel = () => {
@@ -688,7 +690,7 @@ const StockInPage: React.FC = () => {
                   </div>
                   <div className="grid grid-cols-2 gap-3 w-full max-w-xs pt-2">
                     <Button variant="outline" size="sm" onClick={() => clearSessionAndReload()}>Next Registration</Button>
-                    <Button size="sm" onClick={() => window.location.href = '/inventory'}>View Inventory</Button>
+                    <Button size="sm" onClick={() => navigate('/inventory')}>View Inventory</Button>
                   </div>
                 </div>
               ) : (
