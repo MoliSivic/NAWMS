@@ -66,29 +66,32 @@ const tierCoverageConfigs = [
   { palletId: 'PAL-043', locationCode: 'D-03-B-P2', zoneId: 'ZONE-D', shelfNumber: 3, tier: 'bottom' as const, slot: 'P2' as const, security: 'medium' as const, packageCount: 16 },
 ];
 
-function buildTierCoverageDenoms(security: MoneyPackage['securityLevel'], seed: number): DenominationLine[] {
-  if (security === 'high') {
-    return seed % 2 === 0
-      ? [denom('USD', 100, 220 + (seed % 4) * 20)]
-      : [denom('USD', 50, 260), denom('USD', 20, 180)];
+function getPalletSackConfig(palletId: string, locationCode: string): DenominationLine[] {
+  const zoneLetter = locationCode.split('-')[0];
+  const seed = Array.from(palletId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  
+  let denomValue = 100000;
+  if (zoneLetter === 'A') {
+    denomValue = [200000, 100000, 50000][seed % 3];
+  } else if (zoneLetter === 'B') {
+    denomValue = [20000, 10000, 5000][seed % 3];
+  } else if (zoneLetter === 'C') {
+    denomValue = [2000, 1000, 500][seed % 3];
+  } else if (zoneLetter === 'D') {
+    denomValue = [200, 100][seed % 2];
   }
-
-  if (security === 'medium') {
-    return seed % 2 === 0
-      ? [denom('KHR', 50000, 120 + (seed % 3) * 10)]
-      : [denom('KHR', 100000, 45), denom('KHR', 10000, 140)];
-  }
-
-  return seed % 2 === 0
-    ? [denom('KHR', 1000, 700), denom('KHR', 500, 900)]
-    : [denom('KHR', 2000, 350), denom('KHR', 500, 750)];
+  
+  const quantityMultipliers = [10, 25, 50, 100];
+  const quantity = quantityMultipliers[seed % 4];
+  
+  return [denom('KHR', denomValue, quantity)];
 }
 
 let nextTierCoveragePackageId = 339;
 const tierCoveragePackages: MoneyPackage[] = tierCoverageConfigs.flatMap((cfg, cfgIdx) =>
   Array.from({ length: cfg.packageCount }, (_, pkgIdx) => pkgBase(
     nextTierCoveragePackageId++,
-    buildTierCoverageDenoms(cfg.security, cfgIdx + pkgIdx),
+    getPalletSackConfig(cfg.palletId, cfg.locationCode),
     cfg.palletId,
     cfg.locationCode,
     'stored',
@@ -107,87 +110,25 @@ const warehouseRackSlots = [
 ];
 
 export const mockPackages: MoneyPackage[] = [
-  // Pallet PAL-001 (Zone A, high value, 35 packages — nearly full)
-  ...Array.from({ length: 35 }, (_, i) => pkgBase(i + 1,
-    [denom('KHR', 200000, 25)],
-    'PAL-001', 'A-01-T-P1', 'stored', 'high', `2026-03-${String(15 + (i % 15)).padStart(2, '0')}T09:00:00Z`
-  )),
-  // Pallet PAL-002 (Zone A, 5 packages — nearly empty)
-  ...Array.from({ length: 5 }, (_, i) => pkgBase(36 + i,
-    [denom('USD', 100, 200 + i * 50)],
-    'PAL-002', 'A-01-T-P2', 'stored', 'high', `2026-04-01T10:${String(i * 5).padStart(2, '0')}:00Z`
-  )),
-  // Pallet PAL-003 (Zone B, 20 packages — half full)
-  ...Array.from({ length: 20 }, (_, i) => pkgBase(41 + i,
-    i % 2 === 0 ? [denom('KHR', 50000, 100), denom('KHR', 10000, 200)] :
-    [denom('KHR', 100000, 50)],
-    'PAL-003', 'B-02-B-P1', 'stored', 'medium', `2026-03-${String(20 + (i % 10)).padStart(2, '0')}T11:00:00Z`
-  )),
-  // Pallet PAL-004 (Zone B, 40 packages — full)
-  ...Array.from({ length: 40 }, (_, i) => pkgBase(61 + i,
-    [denom('KHR', 50000, 80 + i * 2)],
-    'PAL-004', 'B-02-T-P1', 'stored', 'medium', `2026-03-${String(1 + (i % 28)).padStart(2, '0')}T08:00:00Z`
-  )),
-  // Pallet PAL-005 (Zone C, 10 packages — quarter full)
-  ...Array.from({ length: 10 }, (_, i) => pkgBase(101 + i,
-    [denom('KHR', 1000, 500), denom('KHR', 500, 1000)],
-    'PAL-005', 'C-01-B-P1', 'stored', 'low', `2026-04-01T14:${String(i * 3).padStart(2, '0')}:00Z`
-  )),
-  // Pallet PAL-006 (Zone C, 30 packages — 75%)
-  ...Array.from({ length: 30 }, (_, i) => pkgBase(111 + i,
-    [denom('KHR', 2000, 250)],
-    'PAL-006', 'C-01-T-P1', 'stored', 'low', `2026-03-${String(10 + (i % 20)).padStart(2, '0')}T09:30:00Z`
-  )),
-  // Pallet PAL-007 (Zone D, 15 packages — mixed)
-  ...Array.from({ length: 15 }, (_, i) => pkgBase(141 + i,
-    [denom('USD', 20, 100), denom('KHR', 10000, 50), denom('KHR', 50000, 20)],
-    'PAL-007', 'D-01-B-P2', 'stored', 'medium', `2026-03-25T10:00:00Z`
-  )),
-  // Some in-transit and outbound
-  pkgBase(156, [denom('USD', 100, 300)], 'PAL-008', 'A-02-B-P1', 'in-transit', 'high', '2026-04-02T06:00:00Z'),
-  pkgBase(157, [denom('KHR', 50000, 60)], 'PAL-008', 'A-02-B-P1', 'outbound', 'medium', '2026-04-02T06:30:00Z'),
-
-  // Additional pallets to make the warehouse map feel denser and more active
-  ...Array.from({ length: 18 }, (_, i) => pkgBase(158 + i,
-    i % 2 === 0 ? [denom('USD', 100, 350), denom('USD', 50, 120)] : [denom('USD', 100, 450)],
-    'PAL-013', 'A-03-T-P1', 'stored', 'high', `2026-04-${String(1 + (i % 4)).padStart(2, '0')}T09:${String((i % 6) * 5).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 24 }, (_, i) => pkgBase(176 + i,
-    i % 3 === 0 ? [denom('USD', 100, 300)] : [denom('USD', 50, 280), denom('USD', 20, 150)],
-    'PAL-014', 'A-05-T-P2', 'stored', 'high', `2026-03-${String(20 + (i % 8)).padStart(2, '0')}T10:${String((i % 6) * 5).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 12 }, (_, i) => pkgBase(200 + i,
-    [denom('USD', 20, 500), denom('USD', 10, 300)],
-    'PAL-015', 'A-06-B-P1', 'stored', 'high', `2026-04-${String(2 + (i % 3)).padStart(2, '0')}T11:${String((i % 4) * 10).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 16 }, (_, i) => pkgBase(212 + i,
-    i % 2 === 0 ? [denom('KHR', 50000, 120)] : [denom('KHR', 100000, 60), denom('KHR', 10000, 100)],
-    'PAL-016', 'B-01-T-P2', 'stored', 'medium', `2026-03-${String(12 + (i % 10)).padStart(2, '0')}T08:${String((i % 6) * 6).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 28 }, (_, i) => pkgBase(228 + i,
-    [denom('KHR', 50000, 90 + (i % 5) * 10), denom('KHR', 10000, 150)],
-    'PAL-017', 'B-04-B-P1', 'stored', 'medium', `2026-03-${String(5 + (i % 12)).padStart(2, '0')}T13:${String((i % 6) * 5).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 32 }, (_, i) => pkgBase(256 + i,
-    i % 2 === 0 ? [denom('KHR', 100000, 70)] : [denom('KHR', 50000, 140)],
-    'PAL-018', 'B-07-T-P1', 'stored', 'medium', `2026-03-${String(1 + (i % 14)).padStart(2, '0')}T07:${String((i % 6) * 5).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 14 }, (_, i) => pkgBase(288 + i,
-    [denom('KHR', 20000, 200), denom('KHR', 10000, 180)],
-    'PAL-019', 'B-08-B-P2', 'stored', 'medium', `2026-04-${String(1 + (i % 5)).padStart(2, '0')}T15:${String((i % 6) * 5).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 22 }, (_, i) => pkgBase(302 + i,
-    i % 2 === 0 ? [denom('USD', 20, 150), denom('KHR', 50000, 40)] : [denom('USD', 50, 80), denom('KHR', 10000, 120)],
-    'PAL-020', 'D-02-T-P1', 'stored', 'medium', `2026-03-${String(18 + (i % 7)).padStart(2, '0')}T12:${String((i % 6) * 5).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 9 }, (_, i) => pkgBase(324 + i,
-    [denom('KHR', 1000, 650), denom('KHR', 500, 900)],
-    'PAL-021', 'C-02-T-P1', 'stored', 'low', `2026-04-${String(1 + (i % 3)).padStart(2, '0')}T16:${String((i % 3) * 10).padStart(2, '0')}:00Z`
-  )),
-  ...Array.from({ length: 6 }, (_, i) => pkgBase(333 + i,
-    [denom('USD', 100, 180)],
-    'PAL-022', 'A-04-B-P2', 'stored', 'high', `2026-04-${String(1 + i).padStart(2, '0')}T17:00:00Z`
-  )),
+  ...Array.from({ length: 35 }, (_, i) => pkgBase(i + 1, getPalletSackConfig('PAL-001', 'A-01-T-P1'), 'PAL-001', 'A-01-T-P1', 'stored', 'high', `2026-03-${String(15 + (i % 15)).padStart(2, '0')}T09:00:00Z`)),
+  ...Array.from({ length: 5 }, (_, i) => pkgBase(36 + i, getPalletSackConfig('PAL-002', 'A-01-T-P2'), 'PAL-002', 'A-01-T-P2', 'stored', 'high', `2026-04-01T10:${String(i * 5).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 20 }, (_, i) => pkgBase(41 + i, getPalletSackConfig('PAL-003', 'B-02-B-P1'), 'PAL-003', 'B-02-B-P1', 'stored', 'medium', `2026-03-${String(20 + (i % 10)).padStart(2, '0')}T11:00:00Z`)),
+  ...Array.from({ length: 40 }, (_, i) => pkgBase(61 + i, getPalletSackConfig('PAL-004', 'B-02-T-P1'), 'PAL-004', 'B-02-T-P1', 'stored', 'medium', `2026-03-${String(1 + (i % 28)).padStart(2, '0')}T08:00:00Z`)),
+  ...Array.from({ length: 10 }, (_, i) => pkgBase(101 + i, getPalletSackConfig('PAL-005', 'C-01-B-P1'), 'PAL-005', 'C-01-B-P1', 'stored', 'low', `2026-04-01T14:${String(i * 3).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 30 }, (_, i) => pkgBase(111 + i, getPalletSackConfig('PAL-006', 'C-01-T-P1'), 'PAL-006', 'C-01-T-P1', 'stored', 'low', `2026-03-${String(10 + (i % 20)).padStart(2, '0')}T09:30:00Z`)),
+  ...Array.from({ length: 15 }, (_, i) => pkgBase(141 + i, getPalletSackConfig('PAL-007', 'D-01-B-P2'), 'PAL-007', 'D-01-B-P2', 'stored', 'medium', `2026-03-25T10:00:00Z`)),
+  pkgBase(156, getPalletSackConfig('PAL-008', 'A-02-B-P1'), 'PAL-008', 'A-02-B-P1', 'in-transit', 'high', '2026-04-02T06:00:00Z'),
+  pkgBase(157, getPalletSackConfig('PAL-008', 'A-02-B-P1'), 'PAL-008', 'A-02-B-P1', 'outbound', 'medium', '2026-04-02T06:30:00Z'),
+  ...Array.from({ length: 18 }, (_, i) => pkgBase(158 + i, getPalletSackConfig('PAL-013', 'A-03-T-P1'), 'PAL-013', 'A-03-T-P1', 'stored', 'high', `2026-04-${String(1 + (i % 4)).padStart(2, '0')}T09:${String((i % 6) * 5).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 24 }, (_, i) => pkgBase(176 + i, getPalletSackConfig('PAL-014', 'A-05-T-P2'), 'PAL-014', 'A-05-T-P2', 'stored', 'high', `2026-03-${String(20 + (i % 8)).padStart(2, '0')}T10:${String((i % 6) * 5).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 12 }, (_, i) => pkgBase(200 + i, getPalletSackConfig('PAL-015', 'A-06-B-P1'), 'PAL-015', 'A-06-B-P1', 'stored', 'high', `2026-04-${String(2 + (i % 3)).padStart(2, '0')}T11:${String((i % 4) * 10).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 16 }, (_, i) => pkgBase(212 + i, getPalletSackConfig('PAL-016', 'B-01-T-P2'), 'PAL-016', 'B-01-T-P2', 'stored', 'medium', `2026-03-${String(12 + (i % 10)).padStart(2, '0')}T08:${String((i % 6) * 6).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 28 }, (_, i) => pkgBase(228 + i, getPalletSackConfig('PAL-017', 'B-04-B-P1'), 'PAL-017', 'B-04-B-P1', 'stored', 'medium', `2026-03-${String(5 + (i % 12)).padStart(2, '0')}T13:${String((i % 6) * 5).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 32 }, (_, i) => pkgBase(256 + i, getPalletSackConfig('PAL-018', 'B-07-T-P1'), 'PAL-018', 'B-07-T-P1', 'stored', 'medium', `2026-03-${String(1 + (i % 14)).padStart(2, '0')}T07:${String((i % 6) * 5).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 14 }, (_, i) => pkgBase(288 + i, getPalletSackConfig('PAL-019', 'B-08-B-P2'), 'PAL-019', 'B-08-B-P2', 'stored', 'medium', `2026-04-${String(1 + (i % 5)).padStart(2, '0')}T15:${String((i % 6) * 5).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 22 }, (_, i) => pkgBase(302 + i, getPalletSackConfig('PAL-020', 'D-02-T-P1'), 'PAL-020', 'D-02-T-P1', 'stored', 'medium', `2026-03-${String(18 + (i % 7)).padStart(2, '0')}T12:${String((i % 6) * 5).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 9 }, (_, i) => pkgBase(324 + i, getPalletSackConfig('PAL-021', 'C-02-T-P1'), 'PAL-021', 'C-02-T-P1', 'stored', 'low', `2026-04-${String(1 + (i % 3)).padStart(2, '0')}T16:${String((i % 3) * 10).padStart(2, '0')}:00Z`)),
+  ...Array.from({ length: 6 }, (_, i) => pkgBase(333 + i, getPalletSackConfig('PAL-022', 'A-04-B-P2'), 'PAL-022', 'A-04-B-P2', 'stored', 'high', `2026-04-${String(1 + i).padStart(2, '0')}T17:00:00Z`)),
   ...tierCoveragePackages,
 ];
 
@@ -295,28 +236,28 @@ export const mockTasks: RobotTask[] = [
 
 // ─── Approvals ───
 export const mockApprovals: Approval[] = [
-  { approvalId: 'APR-001', type: 'stock-out', requestedBy: 'USR-002', requestedAt: '2026-04-02T08:00:00Z', status: 'pending', reviewedBy: null, reviewedAt: null, reason: 'Scheduled disbursement to Provincial Branch Siem Reap', details: { packages: 5, totalValue: 250000, denomination: 'USD 100' } },
+  { approvalId: 'APR-001', type: 'stock-out', requestedBy: 'USR-002', requestedAt: '2026-04-02T08:00:00Z', status: 'pending', reviewedBy: null, reviewedAt: null, reason: 'Scheduled disbursement to Provincial Branch Siem Reap', details: { packages: 5, totalValue: 25000000, denomination: 'KHR 200000' } },
   { approvalId: 'APR-002', type: 'stock-out', requestedBy: 'USR-003', requestedAt: '2026-04-02T07:30:00Z', status: 'pending', reviewedBy: null, reviewedAt: null, reason: 'Emergency cash request from Ministry of Finance', details: { packages: 10, totalValue: 50000000, denomination: 'KHR 50000' } },
   { approvalId: 'APR-003', type: 'reorganization', requestedBy: 'SYSTEM', requestedAt: '2026-04-01T23:00:00Z', status: 'pending', reviewedBy: null, reviewedAt: null, reason: 'End-of-day consolidation: merge PAL-005 into PAL-003', details: { source: 'PAL-005', target: 'PAL-003', spaceSaved: '1 pallet slot' } },
-  { approvalId: 'APR-004', type: 'stock-out', requestedBy: 'USR-002', requestedAt: '2026-04-01T15:00:00Z', status: 'approved', reviewedBy: 'USR-001', reviewedAt: '2026-04-01T15:10:00Z', reason: 'Routine transfer to Central Treasury', details: { packages: 3, totalValue: 150000 } },
+  { approvalId: 'APR-004', type: 'stock-out', requestedBy: 'USR-002', requestedAt: '2026-04-01T15:00:00Z', status: 'approved', reviewedBy: 'USR-001', reviewedAt: '2026-04-01T15:10:00Z', reason: 'Routine transfer to Central Treasury', details: { packages: 3, totalValue: 15000000 } },
   { approvalId: 'APR-005', type: 'exception', requestedBy: 'USR-002', requestedAt: '2026-04-02T09:00:00Z', status: 'pending', reviewedBy: null, reviewedAt: null, reason: 'Manual override: pallet PAL-011 requires reassignment due to maintenance', details: { palletId: 'PAL-011' } },
 ];
 
 // ─── Optimization Suggestions ───
 export const mockOptimizations: OptimizationSuggestion[] = [
   { id: 'OPT-001', title: 'Consolidate KHR packages on PAL-005 into PAL-003', description: 'PAL-005 has only 10 packages (25% capacity) of similar denomination to PAL-003 (50% capacity). Merging would free one pallet slot in Zone C.', sourcePallet: 'PAL-005', sourceLocation: 'C-01-B-P1', targetPallet: 'PAL-003', targetLocation: 'B-02-B-P1', benefit: 'Frees 1 pallet slot, reduces fragmentation', riskLevel: 'low', approvalRequired: true, estimatedSpaceSaved: '1 pallet slot (40 pkg capacity)', estimatedTravelReduction: '12%', status: 'pending', createdAt: '2026-04-01T23:00:00Z' },
-  { id: 'OPT-002', title: 'Move older USD packages closer to outbound', description: 'PAL-001 contains 35 high-value USD packages stored since March 15. Relocating to A-02-T-P2 (closer to exit) would improve FIFO retrieval time.', sourcePallet: 'PAL-001', sourceLocation: 'A-01-T-P1', targetPallet: 'PAL-001', targetLocation: 'A-02-T-P2', benefit: 'Reduces retrieval time by ~20 seconds per stock-out', riskLevel: 'medium', approvalRequired: true, estimatedSpaceSaved: 'N/A (relocation only)', estimatedTravelReduction: '18%', status: 'pending', createdAt: '2026-04-01T23:00:00Z' },
+  { id: 'OPT-002', title: 'Move older KHR packages closer to outbound', description: 'PAL-001 contains 35 high-value KHR packages stored since March 15. Relocating to A-02-T-P2 (closer to exit) would improve FIFO retrieval time.', sourcePallet: 'PAL-001', sourceLocation: 'A-01-T-P1', targetPallet: 'PAL-001', targetLocation: 'A-02-T-P2', benefit: 'Reduces retrieval time by ~20 seconds per stock-out', riskLevel: 'medium', approvalRequired: true, estimatedSpaceSaved: 'N/A (relocation only)', estimatedTravelReduction: '18%', status: 'pending', createdAt: '2026-04-01T23:00:00Z' },
   { id: 'OPT-003', title: 'Rebalance Zone B shelf load', description: 'Shelf B-02 has one full pallet (40 pkgs) and one half pallet (20 pkgs). Suggest distributing 10 packages from PAL-004 to PAL-009 on B-03 for better balance.', sourcePallet: 'PAL-004', sourceLocation: 'B-02-T-P1', targetPallet: 'PAL-009', targetLocation: 'B-03-T-P2', benefit: 'Improves shelf weight distribution, easier access', riskLevel: 'low', approvalRequired: true, estimatedSpaceSaved: 'Improves access to 10 packages', estimatedTravelReduction: '8%', status: 'pending', createdAt: '2026-04-01T23:00:00Z' },
   { id: 'OPT-004', title: 'Schedule PAL-011 maintenance return', description: 'PAL-011 has been in maintenance for 5 days. If repairs complete today, it can be returned to Zone D shelf D-01-T-P1.', sourcePallet: 'PAL-011', sourceLocation: 'Maintenance Area', targetPallet: 'PAL-011', targetLocation: 'D-01-T-P1', benefit: 'Restores 1 pallet capacity to Zone D', riskLevel: 'low', approvalRequired: false, estimatedSpaceSaved: '1 pallet slot (40 pkg capacity)', estimatedTravelReduction: 'N/A', status: 'pending', createdAt: '2026-04-02T06:00:00Z' },
 ];
 
 // ─── Audit Logs ───
 export const mockAuditLogs: AuditLog[] = [
-  { logId: 1, userId: 'USR-002', userName: 'Op. Vann Dara', action: 'STOCK_IN', entityType: 'Package', entityId: 'PKG-00156', details: 'Registered incoming USD package from Central Treasury', ipAddress: '10.0.1.42', timestamp: '2026-04-02T08:30:00Z' },
+  { logId: 1, userId: 'USR-002', userName: 'Op. Vann Dara', action: 'STOCK_IN', entityType: 'Package', entityId: 'PKG-00156', details: 'Registered incoming KHR package from Central Treasury', ipAddress: '10.0.1.42', timestamp: '2026-04-02T08:30:00Z' },
   { logId: 2, userId: 'USR-002', userName: 'Op. Vann Dara', action: 'PALLET_ASSIGN', entityType: 'Pallet', entityId: 'PAL-008', details: 'Assigned PKG-00156 to PAL-008', ipAddress: '10.0.1.42', timestamp: '2026-04-02T08:31:00Z' },
   { logId: 3, userId: 'USR-002', userName: 'Op. Vann Dara', action: 'QR_PRINT', entityType: 'Package', entityId: 'PKG-00156', details: 'QR label printed successfully', ipAddress: '10.0.1.42', timestamp: '2026-04-02T08:31:30Z' },
   { logId: 4, userId: 'USR-002', userName: 'Op. Vann Dara', action: 'ROBOT_TASK_CREATE', entityType: 'Task', entityId: 'TSK-00001', details: 'Created storage task for PAL-008 to A-02-B-P1', ipAddress: '10.0.1.42', timestamp: '2026-04-02T08:32:00Z' },
-  { logId: 5, userId: 'USR-001', userName: 'Admin Chea Sokha', action: 'STOCK_OUT_APPROVE', entityType: 'Approval', entityId: 'APR-004', details: 'Approved stock-out request for 3 packages, total value $150,000', ipAddress: '10.0.1.15', timestamp: '2026-04-01T15:10:00Z' },
+  { logId: 5, userId: 'USR-001', userName: 'Admin Chea Sokha', action: 'STOCK_OUT_APPROVE', entityType: 'Approval', entityId: 'APR-004', details: 'Approved stock-out request for 3 packages, total value 15,000,000 KHR', ipAddress: '10.0.1.15', timestamp: '2026-04-01T15:10:00Z' },
   { logId: 6, userId: 'USR-003', userName: 'Op. Srey Leak', action: 'STOCK_OUT_REQUEST', entityType: 'Approval', entityId: 'APR-002', details: 'Submitted stock-out request: 10 KHR 50000 packages for Ministry of Finance', ipAddress: '10.0.1.43', timestamp: '2026-04-02T07:30:00Z' },
   { logId: 7, userId: 'USR-001', userName: 'Admin Chea Sokha', action: 'USER_DEACTIVATE', entityType: 'User', entityId: 'USR-006', details: 'Deactivated user Op. Meas Sophea', ipAddress: '10.0.1.10', timestamp: '2026-03-15T09:30:00Z' },
   { logId: 8, userId: 'SYSTEM', userName: 'System', action: 'OPTIMIZATION_GENERATE', entityType: 'Optimization', entityId: 'OPT-001', details: 'Generated end-of-day consolidation suggestion for PAL-005', ipAddress: 'system', timestamp: '2026-04-01T23:00:00Z' },

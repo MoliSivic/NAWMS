@@ -128,6 +128,14 @@ const WarehouseMapPage: React.FC = () => {
               <div className="flex justify-between"><span className="text-muted-foreground">Packages</span><span>{pallet.currentPackageCount} / {pallet.maxCapacity}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Occupancy</span><span>{Math.round(selectedSlot.occupancy * 100)}%</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">Pallet Status</span><span className="capitalize">{pallet.status}</span></div>
+              {palletPkgs.length > 0 && (
+                <>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Stock-In Date</span><span>{new Date(palletPkgs[0].arrivalDate).toLocaleDateString()}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Duration Stored</span><span>{Math.max(0, Math.floor((new Date().getTime() - new Date(palletPkgs[0].arrivalDate).getTime()) / (1000 * 3600 * 24)))} days</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Denomination</span><span>{palletPkgs[0].currency} {palletPkgs[0].denominations[0]?.denomination.toLocaleString()}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Notes per Sack</span><span>{palletPkgs[0].denominations[0]?.quantity.toLocaleString()} pcs</span></div>
+                </>
+              )}
               <div className="w-full h-2 bg-background rounded-full overflow-hidden">
                 <div className={`h-full rounded-full ${
                   selectedSlot.occupancy >= 0.9 ? 'bg-success' :
