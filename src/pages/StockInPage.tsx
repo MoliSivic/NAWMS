@@ -71,7 +71,22 @@ const StockInPage: React.FC = () => {
 
   const totalValue = useMemo(() => valuePerSack * packageCount, [valuePerSack, packageCount]);
 
-  const khrDenoms = [200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
+  const filteredDenoms = useMemo(() => {
+    switch (security) {
+      case 'high': return [200000, 100000, 50000];
+      case 'medium': return [20000, 10000, 5000];
+      case 'low': return [2000, 1000, 500];
+      case 'mixed': return [200, 100];
+      default: return [200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
+    }
+  }, [security]);
+
+  useEffect(() => {
+    if (!filteredDenoms.includes(singleDenom)) {
+      handleDenomChange(filteredDenoms[0]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredDenoms, singleDenom]);
 
   const availablePallets = useMemo(() => {
     let allowedZones: string[] = [];
@@ -375,9 +390,10 @@ const StockInPage: React.FC = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="high">L1 - Restricted (Zone A)</SelectItem>
-                      <SelectItem value="medium">L2 - Standard (Zone B/D)</SelectItem>
-                      <SelectItem value="low">L3 - General (Zone C/D)</SelectItem>
+                      <SelectItem value="high">Zone A — 50K, 100K, 200K KHR</SelectItem>
+                      <SelectItem value="medium">Zone B — 5K, 10K, 20K KHR</SelectItem>
+                      <SelectItem value="low">Zone C — 500, 1K, 2K KHR</SelectItem>
+                      <SelectItem value="mixed">Zone D — 100, 200 KHR</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -401,7 +417,7 @@ const StockInPage: React.FC = () => {
                     <label className="block text-xs text-muted-foreground mb-1">Denomination</label>
                     <Select value={String(singleDenom)} onValueChange={(v) => handleDenomChange(Number(v))}>
                       <SelectTrigger className="h-9 text-sm bg-background font-mono"><SelectValue /></SelectTrigger>
-                      <SelectContent>{khrDenoms.map(d => (<SelectItem key={d} value={String(d)}>{d.toLocaleString()}</SelectItem>))}</SelectContent>
+                      <SelectContent>{filteredDenoms.map(d => (<SelectItem key={d} value={String(d)}>{d.toLocaleString()}</SelectItem>))}</SelectContent>
                     </Select>
                   </div>
                   <div>
