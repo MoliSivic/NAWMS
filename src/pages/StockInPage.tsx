@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { mockPallets, mockShelfLocations, mockZones, mockPackages } from '@/data/mockData';
 import { warehouseLayout } from '@/data/warehouseLayout';
-import { CheckCircle, Printer, QrCode, ArrowRight, MapPin, ShieldCheck, Box, Loader2, ScanLine, Check } from 'lucide-react';
+import { CheckCircle, Printer, QrCode, ArrowRight, MapPin, ShieldCheck, Box, Loader2, ScanLine, Check, XCircle } from 'lucide-react';
 import WarehouseCanvas, { LiveTask } from '@/components/WarehouseCanvas';
 import qrCodeImg from '@/assets/qr-code.png';
 
@@ -126,6 +126,15 @@ const StockInPage: React.FC = () => {
     }
     return null;
   }, [selectedPallet, suggestedPallet]);
+
+  const previewPkgId = useMemo(() => {
+    const existingPkgIds = new Set(mockPackages.map(p => p.packageId));
+    let nextId = mockPackages.length + 500;
+    while (existingPkgIds.has(`PKG-${String(nextId).padStart(5, '0')}`)) {
+      nextId++;
+    }
+    return `PKG-${String(nextId).padStart(5, '0')}`;
+  }, []);
 
   // Independent Robot simulation logic
   const handleRobotMovement = () => {
@@ -279,7 +288,32 @@ const StockInPage: React.FC = () => {
   };
 
   const handleCancel = () => {
-    if (confirm('Discard registration?')) clearSessionAndReload();
+    if (confirm('Discard registration and abort operation? Data will be reverted.')) {
+      const palletObj = mockPallets.find(p => p.palletId === effectivePalletId);
+      if (palletObj && palletObj.status === 'in-use') {
+        palletObj.status = 'available';
+        palletObj.currentPackageCount = 0;
+        palletObj.locationCode = '';
+        palletObj.packages = [];
+      }
+      if (suggestedLocation?.locationId) {
+        for (const shelf of warehouseLayout.shelves) {
+          const slot = shelf.slots.find(s => s.locationId === suggestedLocation.locationId);
+          if (slot && slot.palletId === effectivePalletId) {
+            slot.palletId = null;
+            slot.occupancy = 0;
+            break;
+          }
+        }
+      }
+      for (let i = mockPackages.length - 1; i >= 0; i--) {
+        if (mockPackages[i].palletId === effectivePalletId) {
+          mockPackages.splice(i, 1);
+        }
+      }
+      setCompletedStockIns(prev => prev.filter(c => c.palletId !== effectivePalletId));
+      clearSessionAndReload();
+    }
   };
 
   const liveTask: LiveTask | null = useMemo(() => {
@@ -592,29 +626,33 @@ const StockInPage: React.FC = () => {
                       <img src={qrCodeImg} alt="Master Pallet QR Code" className="w-40 h-40 object-contain mix-blend-multiply" />
                     </div>
                     
-                    <div className="w-full text-left space-y-1.5 bg-slate-50/50 p-3 rounded-md border border-slate-200">
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Pallet Ref</span>
+                    <div className="w-full text-left space-y-1 bg-slate-50/50 p-2.5 rounded-md border border-slate-200">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Package ID</span>
+                        <span className="font-mono font-bold text-[10px] text-slate-500 leading-none">{previewPkgId}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Pallet</span>
                         <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{effectivePalletId}</span>
                       </div>
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Destination</span>
-                        <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{suggestedLocation?.code || 'PENDING'}</span>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Location</span>
+                        <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{suggestedLocation?.locationId || 'PENDING'}</span>
                       </div>
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Date</span>
-                        <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{new Date().toISOString().split('T')[0]}</span>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Arrival</span>
+                        <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{new Date().toLocaleDateString('en-GB')}</span>
                       </div>
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Denomination</span>
-                        <span className="font-bold text-[11px] text-slate-800 leading-none">{currency} {singleDenom.toLocaleString()}</span>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Source</span>
+                        <span className="font-bold text-[10px] text-slate-800 leading-none truncate max-w-[100px] text-right">{source}</span>
                       </div>
-                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Notes / Sack</span>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Notes per Sack</span>
                         <span className="font-bold text-[11px] text-slate-800 leading-none">{(valuePerSack / singleDenom).toLocaleString()} pcs</span>
                       </div>
                       <div className="flex justify-between items-center">
-                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Value / Sack</span>
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Value</span>
                         <span className="font-bold text-[11px] text-slate-800 leading-none">{currency} {valuePerSack.toLocaleString()}</span>
                       </div>
                     </div>
@@ -706,13 +744,21 @@ const StockInPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="relative aspect-video bg-muted/50 rounded-lg border flex items-center justify-center overflow-hidden">
-                  <Box className="w-16 h-16 text-muted-foreground/20" />
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/5">
-                    <div className="bg-white/90 backdrop-blur px-3 py-1.5 rounded-full border shadow-sm flex items-center gap-2">
-                      <Loader2 className="w-3 h-3 animate-spin text-primary" />
-                      <span className="text-[10px] font-bold text-primary uppercase tracking-tighter">Live Camera: Inbound Area 01</span>
+                <div className="flex flex-col h-full">
+                  <div className="relative aspect-video bg-muted/50 rounded-lg border flex items-center justify-center overflow-hidden shrink-0">
+                    <Box className="w-16 h-16 text-muted-foreground/20" />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/5">
+                      <div className="bg-white/90 backdrop-blur px-3 py-1.5 rounded-full border shadow-sm flex items-center gap-2">
+                        <Loader2 className="w-3 h-3 animate-spin text-primary" />
+                        <span className="text-[10px] font-bold text-primary uppercase tracking-tighter">Live Camera: Inbound Area 01</span>
+                      </div>
                     </div>
+                  </div>
+                  <div className="flex-1 min-h-[16px]"></div>
+                  <div className="flex justify-end mt-auto">
+                    <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive hover:bg-destructive/10" onClick={handleCancel}>
+                      Abort Operation
+                    </Button>
                   </div>
                 </div>
               </div>
