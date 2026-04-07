@@ -1,7 +1,8 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { mockPallets, mockShelfLocations, mockZones } from '@/data/mockData';
+import { mockPallets, mockShelfLocations, mockZones, mockPackages } from '@/data/mockData';
+import { warehouseLayout } from '@/data/warehouseLayout';
 import { CheckCircle, Printer, QrCode, ArrowRight, MapPin, ShieldCheck, Box, Loader2, ScanLine, Check } from 'lucide-react';
 import WarehouseCanvas, { LiveTask } from '@/components/WarehouseCanvas';
 
@@ -9,25 +10,43 @@ interface DenomRow { currency: string; denomination: number; quantity: number; }
 
 const steps = ['Manifest', 'Count', 'Assignment', 'Retrieval', 'Loading', 'Dispatch'];
 
+function useSessionState<T>(key: string, initialValue: T) {
+  const [state, setState] = useState<T>(() => {
+    try {
+      const saved = sessionStorage.getItem(key);
+      if (saved !== null) {
+        return JSON.parse(saved);
+      }
+    } catch {}
+    return initialValue;
+  });
+
+  useEffect(() => {
+    sessionStorage.setItem(key, JSON.stringify(state));
+  }, [key, state]);
+
+  return [state, setState] as const;
+}
+
 const StockInPage: React.FC = () => {
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useSessionState('nawms_si_step', 0);
   const mode = 'single';
   const currency = 'KHR';
-  const [singleDenom, setSingleDenom] = useState(100000);
-  const [valuePerSack, setValuePerSack] = useState(100000000);
-  const [packageCount, setPackageCount] = useState(40);
+  const [singleDenom, setSingleDenom] = useSessionState('nawms_si_denom', 100000);
+  const [valuePerSack, setValuePerSack] = useSessionState('nawms_si_valuePerSack', 100000000);
+  const [packageCount, setPackageCount] = useSessionState('nawms_si_packageCount', 40);
   
-  const [source, setSource] = useState('Central Treasury');
-  const [security, setSecurity] = useState('high');
+  const [source, setSource] = useSessionState('nawms_si_source', 'Central Treasury');
+  const [security, setSecurity] = useSessionState('nawms_si_security', 'high');
 
-  const [palletId, setPalletId] = useState('');
-  const [robotStatus, setRobotStatus] = useState<'idle' | 'retrieving' | 'arrived' | 'storing' | 'completed' | 'emergency_stop'>('idle');
-  const [retrievalPhase, setRetrievalPhase] = useState<'idle' | 'moving_to_shelf' | 'loading' | 'returning'>('idle');
-  const [storingPhase, setStoringPhase] = useState<'idle' | 'moving_to_shelf' | 'unloading' | 'returning'>('idle');
-  const [isLabelAttached, setIsLabelAttached] = useState(false);
-  const [isPrinting, setIsPrinting] = useState(false);
-  const [countdown, setCountdown] = useState<number | null>(null);
-  const [completedStockIns, setCompletedStockIns] = useState<{ locationId: string, palletId: string, packageCount: number }[]>([]);
+  const [palletId, setPalletId] = useSessionState('nawms_si_palletId', '');
+  const [robotStatus, setRobotStatus] = useSessionState<'idle' | 'retrieving' | 'arrived' | 'storing' | 'completed' | 'emergency_stop'>('nawms_si_robotStatus', 'idle');
+  const [retrievalPhase, setRetrievalPhase] = useSessionState<'idle' | 'moving_to_shelf' | 'loading' | 'returning'>('nawms_si_retrievalPhase', 'idle');
+  const [storingPhase, setStoringPhase] = useSessionState<'idle' | 'moving_to_shelf' | 'unloading' | 'returning'>('nawms_si_storingPhase', 'idle');
+  const [isLabelAttached, setIsLabelAttached] = useSessionState('nawms_si_isLabelAttached', false);
+  const [isPrinting, setIsPrinting] = useSessionState('nawms_si_isPrinting', false);
+  const [countdown, setCountdown] = useSessionState<number | null>('nawms_si_countdown', null);
+  const [completedStockIns, setCompletedStockIns] = useSessionState<{ locationId: string, palletId: string, packageCount: number }[]>('nawms_si_completedStockIns', []);
   const initialRetrievalTime = React.useRef(20);
 
   // --- Sack Value Logic ---
@@ -98,19 +117,32 @@ const StockInPage: React.FC = () => {
 
   const handleLiveTaskArrival = useCallback(() => {
     if (retrievalPhase === 'moving_to_shelf') {
-      // Robot physically arrived at the shelf.
       setRetrievalPhase('loading');
-      // Simulate taking the pallet for 4 seconds
-      setTimeout(() => setRetrievalPhase('returning'), 4000);
     } else if (retrievalPhase === 'returning') {
-      // Robot physically arrived back at the door perfectly.
       setRobotStatus('arrived');
       setRetrievalPhase('idle');
     }
 
     if (storingPhase === 'moving_to_shelf') {
       setStoringPhase('unloading');
-      setTimeout(() => {
+    } else if (storingPhase === 'returning') {
+      setRobotStatus('completed');
+      setStoringPhase('idle');
+    }
+  }, [retrievalPhase, storingPhase, setRetrievalPhase, setRobotStatus, setStoringPhase]);
+
+  useEffect(() => {
+    let t: string | number | NodeJS.Timeout | undefined;
+    if (retrievalPhase === 'loading') {
+       t = setTimeout(() => setRetrievalPhase('returning'), 4000);
+    }
+    return () => clearTimeout(t);
+  }, [retrievalPhase, setRetrievalPhase]);
+
+  useEffect(() => {
+    let t: string | number | NodeJS.Timeout | undefined;
+    if (storingPhase === 'unloading') {
+       t = setTimeout(() => {
         setStoringPhase('returning');
         if (suggestedLocation?.locationId) {
           setCompletedStockIns(prev => [...prev, {
@@ -118,13 +150,27 @@ const StockInPage: React.FC = () => {
             palletId: effectivePalletId,
             packageCount: packageCount
           }]);
+          
+          const palletObj = mockPallets.find(p => p.palletId === effectivePalletId);
+          if (palletObj) {
+            palletObj.currentPackageCount = packageCount;
+            palletObj.locationCode = suggestedLocation.locationId;
+            palletObj.status = 'in-use';
+          }
+          
+          for (const shelf of warehouseLayout.shelves) {
+            const slot = shelf.slots.find(s => s.locationId === suggestedLocation.locationId);
+            if (slot) {
+              slot.palletId = effectivePalletId;
+              slot.occupancy = packageCount / 40;
+              break;
+            }
+          }
         }
-      }, 4000);
-    } else if (storingPhase === 'returning') {
-      setRobotStatus('completed');
-      setStoringPhase('idle');
+       }, 4000);
     }
-  }, [retrievalPhase, storingPhase, suggestedLocation, effectivePalletId, packageCount]);
+    return () => clearTimeout(t);
+  }, [storingPhase, suggestedLocation, effectivePalletId, packageCount, setStoringPhase, setCompletedStockIns]);
 
   // Independent Printing Logic
   const handlePrintingDispatch = () => {
@@ -153,8 +199,26 @@ const StockInPage: React.FC = () => {
     alert('EMERGENCY STOP ACTIVATED: Robot ROB-002 halted. Safety protocol engaged.');
   };
 
+  const clearSessionAndReload = () => {
+    sessionStorage.removeItem('nawms_si_step');
+    sessionStorage.removeItem('nawms_si_denom');
+    sessionStorage.removeItem('nawms_si_valuePerSack');
+    sessionStorage.removeItem('nawms_si_packageCount');
+    sessionStorage.removeItem('nawms_si_source');
+    sessionStorage.removeItem('nawms_si_security');
+    sessionStorage.removeItem('nawms_si_palletId');
+    sessionStorage.removeItem('nawms_si_robotStatus');
+    sessionStorage.removeItem('nawms_si_retrievalPhase');
+    sessionStorage.removeItem('nawms_si_storingPhase');
+    sessionStorage.removeItem('nawms_si_isLabelAttached');
+    sessionStorage.removeItem('nawms_si_isPrinting');
+    sessionStorage.removeItem('nawms_si_countdown');
+    sessionStorage.removeItem('nawms_si_completedStockIns');
+    window.location.reload();
+  };
+
   const handleCancel = () => {
-    if (confirm('Discard registration?')) window.location.reload();
+    if (confirm('Discard registration?')) clearSessionAndReload();
   };
 
   const liveTask: LiveTask | null = useMemo(() => {
@@ -581,7 +645,7 @@ const StockInPage: React.FC = () => {
                   <p className="text-xs text-muted-foreground max-w-xs mx-auto">Pallet <span className="font-mono font-bold text-foreground">{effectivePalletId}</span> containing {packageCount} sacks of {currency} {singleDenom.toLocaleString()} is now securely stored at <span className="font-mono font-bold text-foreground">{suggestedLocation?.code}</span>.</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 w-full max-w-xs pt-2">
-                  <Button variant="outline" size="sm" onClick={() => window.location.reload()}>Next Registration</Button>
+                  <Button variant="outline" size="sm" onClick={() => clearSessionAndReload()}>Next Registration</Button>
                   <Button size="sm" onClick={() => window.location.href='/inventory'}>View Inventory</Button>
                 </div>
               </div>
