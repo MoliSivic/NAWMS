@@ -91,13 +91,12 @@ const WarehouseMapPage: React.FC = () => {
                             });
                           }
                         }}
-                        className={`p-2 rounded text-center transition-colors ${
-                          isSelected
+                        className={`p-2 rounded text-center transition-colors ${isSelected
                             ? 'bg-primary/15 border-2 border-primary/50 ring-1 ring-primary/20'
                             : hasPallet
                               ? 'bg-primary/10 border border-primary/30 hover:bg-primary/20 cursor-pointer'
                               : 'bg-muted/30 border border-border hover:bg-muted/50 cursor-pointer'
-                        }`}
+                          }`}
                       >
                         <div className="text-[9px] text-muted-foreground">{label}</div>
                         <div className={`text-[10px] font-semibold ${hasPallet ? 'text-primary' : 'text-muted-foreground'}`}>
@@ -137,11 +136,10 @@ const WarehouseMapPage: React.FC = () => {
                 </>
               )}
               <div className="w-full h-2 bg-background rounded-full overflow-hidden">
-                <div className={`h-full rounded-full ${
-                  selectedSlot.occupancy >= 0.9 ? 'bg-success' :
-                  selectedSlot.occupancy >= 0.5 ? 'bg-info' :
-                  selectedSlot.occupancy >= 0.25 ? 'bg-warning' : 'bg-destructive'
-                }`} style={{ width: `${selectedSlot.occupancy * 100}%` }} />
+                <div className={`h-full rounded-full ${selectedSlot.occupancy >= 0.9 ? 'bg-success' :
+                    selectedSlot.occupancy >= 0.5 ? 'bg-info' :
+                      selectedSlot.occupancy >= 0.25 ? 'bg-warning' : 'bg-destructive'
+                  }`} style={{ width: `${selectedSlot.occupancy * 100}%` }} />
               </div>
               {palletPkgs.length > 0 && (
                 <div className="mt-2">
