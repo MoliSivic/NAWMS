@@ -56,6 +56,7 @@ export interface WarehouseCanvasProps {
   className?: string;
   liveTask?: LiveTask | null;
   onLiveTaskArrival?: () => void;
+  completedStockIns?: { locationId: string, palletId: string, packageCount: number }[];
 }
 
 // ─── Helpers ───
@@ -192,6 +193,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   className,
   liveTask,
   onLiveTaskArrival,
+  completedStockIns,
 }) => {
   const controlPalette = getMapControlPalette();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -464,7 +466,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
 
     animFrame.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(animFrame.current);
-  }, [canvasSize, pxPerM, selectedSlotId, offsetX, offsetY]);
+  }, [canvasSize, pxPerM, selectedSlotId, offsetX, offsetY, completedStockIns]);
 
   // ─── Draw function ───
   function draw(ctx: CanvasRenderingContext2D, s: number) {
@@ -628,11 +630,21 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
 
         // Occupancy color
         let fill = p.slotEmpty;
-        if (slot.palletId) {
-          if (slot.occupancy === 0) fill = p.slotPalletOnly;
-          else if (slot.occupancy >= 0.9) fill = p.slotHigh;
-          else if (slot.occupancy >= 0.5) fill = p.slotMed;
-          else if (slot.occupancy >= 0.25) fill = p.slotLow;
+        let slotOccupancy = slot.occupancy;
+        let slotPalletId = slot.palletId;
+
+        if (completedStockIns) {
+          const matchingLive = completedStockIns.find(c => c.locationId === slot.locationId);
+          if (matchingLive) {
+            slotPalletId = matchingLive.palletId;
+            slotOccupancy = matchingLive.packageCount / 40;
+          }
+        }
+
+        if (slotPalletId) {
+          if (slotOccupancy === 0) fill = p.slotPalletOnly;
+          else if (slotOccupancy >= 0.75) fill = p.slotMed;
+          else if (slotOccupancy >= 0.3) fill = p.slotLow;
           else fill = p.slotCrit;
         }
 
@@ -649,8 +661,8 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           locationId: slot.locationId,
           tier: slot.tier,
           slot: slot.slot,
-          palletId: slot.palletId,
-          occupancy: slot.occupancy,
+          palletId: slotPalletId,
+          occupancy: slotOccupancy,
           shelfId: shelf.shelfId,
           zoneId: shelf.zoneId,
           rect: { x: rx, y: ry, w: slotW, h: slotH },

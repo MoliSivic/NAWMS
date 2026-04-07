@@ -27,6 +27,7 @@ const StockInPage: React.FC = () => {
   const [isLabelAttached, setIsLabelAttached] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [completedStockIns, setCompletedStockIns] = useState<{ locationId: string, palletId: string, packageCount: number }[]>([]);
   const initialRetrievalTime = React.useRef(20);
 
   // --- Sack Value Logic ---
@@ -109,12 +110,21 @@ const StockInPage: React.FC = () => {
 
     if (storingPhase === 'moving_to_shelf') {
       setStoringPhase('unloading');
-      setTimeout(() => setStoringPhase('returning'), 4000);
+      setTimeout(() => {
+        setStoringPhase('returning');
+        if (suggestedLocation?.locationId) {
+          setCompletedStockIns(prev => [...prev, {
+            locationId: suggestedLocation.locationId,
+            palletId: effectivePalletId,
+            packageCount: packageCount
+          }]);
+        }
+      }, 4000);
     } else if (storingPhase === 'returning') {
       setRobotStatus('completed');
       setStoringPhase('idle');
     }
-  }, [retrievalPhase, storingPhase]);
+  }, [retrievalPhase, storingPhase, suggestedLocation, effectivePalletId, packageCount]);
 
   // Independent Printing Logic
   const handlePrintingDispatch = () => {
@@ -610,6 +620,7 @@ const StockInPage: React.FC = () => {
               selectedSlotId={suggestedLocation?.locationId ?? null}
               liveTask={liveTask}
               onLiveTaskArrival={handleLiveTaskArrival}
+              completedStockIns={completedStockIns}
               onSlotClick={(slot) => {
                 if (step < 3 && slot.palletId) setPalletId(slot.palletId);
               }}
