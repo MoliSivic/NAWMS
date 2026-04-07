@@ -156,6 +156,49 @@ const StockInPage: React.FC = () => {
             palletObj.currentPackageCount = packageCount;
             palletObj.locationCode = suggestedLocation.locationId;
             palletObj.status = 'in-use';
+            palletObj.packages = [];
+          }
+
+          const existingPkgIds = new Set(mockPackages.map(p => p.packageId));
+          let nextId = mockPackages.length + 500;
+
+          for (let i = 0; i < packageCount; i++) {
+            while (existingPkgIds.has(`PKG-${String(nextId).padStart(5, '0')}`)) {
+              nextId++;
+            }
+            const pkgId = `PKG-${String(nextId).padStart(5, '0')}`;
+            const pkgValue = valuePerSack;
+            const pkgQuantity = valuePerSack / singleDenom;
+            
+            mockPackages.push({
+              packageId: pkgId,
+              qrCode: `NBC-${pkgId}`,
+              productType: 'Banknotes',
+              denominations: [{
+                currency: currency,
+                denomination: singleDenom,
+                quantity: pkgQuantity,
+                subtotal: pkgValue
+              }],
+              totalValue: pkgValue,
+              currency: currency,
+              palletId: effectivePalletId,
+              locationCode: suggestedLocation.locationId,
+              status: 'stored',
+              securityLevel: security as any,
+              sealStatus: 'sealed',
+              source: source,
+              arrivalDate: new Date().toISOString(),
+              releasedDate: null,
+              registeredBy: 'OP-042',
+              createdAt: new Date().toISOString(),
+              notes: 'System Generated'
+            });
+            
+            existingPkgIds.add(pkgId);
+            if (palletObj) {
+              palletObj.packages.push(pkgId);
+            }
           }
 
           for (const shelf of warehouseLayout.shelves) {
