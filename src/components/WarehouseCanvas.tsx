@@ -572,11 +572,13 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
     );
     ctx.fillStyle = p.doorText;
     ctx.font = `bold ${Math.max(10, s * 1)}px sans-serif`;
+    ctx.textBaseline = "top";
     ctx.fillText(
       "DOOR (In/Out)",
       toCanvasX(door.x) + 4,
-      toCanvasY(door.y) + (door.height * s) / 2 + 4,
+      toCanvasY(door.y) + 4,
     );
+    ctx.textBaseline = "alphabetic";
 
     // Shelves + slots
     const newSlots: SlotInfo[] = [];

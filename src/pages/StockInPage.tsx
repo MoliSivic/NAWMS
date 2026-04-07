@@ -6,6 +6,7 @@ import { mockPallets, mockShelfLocations, mockZones, mockPackages } from '@/data
 import { warehouseLayout } from '@/data/warehouseLayout';
 import { CheckCircle, Printer, QrCode, ArrowRight, MapPin, ShieldCheck, Box, Loader2, ScanLine, Check } from 'lucide-react';
 import WarehouseCanvas, { LiveTask } from '@/components/WarehouseCanvas';
+import qrCodeImg from '@/assets/qr-code.png';
 
 interface DenomRow { currency: string; denomination: number; quantity: number; }
 
@@ -581,10 +582,30 @@ const StockInPage: React.FC = () => {
                 </div>
 
                 <div className="flex flex-col gap-3">
-                  <div className="flex-1 bg-white border-2 border-primary/20 border-dashed rounded-lg flex flex-col items-center justify-center text-center p-4">
-                    <QrCode className="w-16 h-16 text-primary/20 mb-2" />
-                    <p className="text-[10px] font-bold text-primary mb-1">Labels Ready</p>
-                    <p className="text-[9px] text-muted-foreground">Review batch identifiers above</p>
+                  <div className="flex-1 bg-white border-2 border-slate-300 border-dashed rounded-lg flex flex-col items-center justify-center p-3 relative shadow-sm">
+                    <div className="absolute top-0 w-full bg-slate-100 border-b border-slate-200 py-1.5 px-3 flex justify-between items-center rounded-t-lg">
+                       <span className="text-[9px] font-bold tracking-widest text-slate-500 uppercase">NBC Vault - Official Stamp</span>
+                       <QrCode className="w-3 h-3 text-slate-400" />
+                    </div>
+                    
+                    <div className="mt-6 mb-3 p-2 border-2 border-slate-200 rounded-md bg-white">
+                      <img src={qrCodeImg} alt="Master Pallet QR Code" className="w-40 h-40 object-contain mix-blend-multiply" />
+                    </div>
+                    
+                    <div className="w-full text-left space-y-2 bg-slate-50/50 p-3 rounded-md border border-slate-200">
+                      <div className="flex justify-between items-end border-b border-slate-200 pb-1.5">
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Denomination</span>
+                        <span className="font-mono font-bold text-base leading-none text-slate-800">{currency} {singleDenom.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-end border-b border-slate-200 pb-1.5">
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Bundle Size</span>
+                        <span className="font-bold text-sm leading-none text-slate-800">{(valuePerSack / singleDenom).toLocaleString()} pcs</span>
+                      </div>
+                      <div className="flex justify-between items-end">
+                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Sack Value</span>
+                        <span className="font-bold text-base leading-none text-slate-800">{currency} {valuePerSack.toLocaleString()}</span>
+                      </div>
+                    </div>
                   </div>
                   <Button
                     size="sm"
