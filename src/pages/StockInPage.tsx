@@ -592,18 +592,30 @@ const StockInPage: React.FC = () => {
                       <img src={qrCodeImg} alt="Master Pallet QR Code" className="w-40 h-40 object-contain mix-blend-multiply" />
                     </div>
                     
-                    <div className="w-full text-left space-y-2 bg-slate-50/50 p-3 rounded-md border border-slate-200">
-                      <div className="flex justify-between items-end border-b border-slate-200 pb-1.5">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Denomination</span>
-                        <span className="font-mono font-bold text-base leading-none text-slate-800">{currency} {singleDenom.toLocaleString()}</span>
+                    <div className="w-full text-left space-y-1.5 bg-slate-50/50 p-3 rounded-md border border-slate-200">
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Pallet Ref</span>
+                        <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{effectivePalletId}</span>
                       </div>
-                      <div className="flex justify-between items-end border-b border-slate-200 pb-1.5">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Bundle Size</span>
-                        <span className="font-bold text-sm leading-none text-slate-800">{(valuePerSack / singleDenom).toLocaleString()} pcs</span>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Destination</span>
+                        <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{suggestedLocation?.code || 'PENDING'}</span>
                       </div>
-                      <div className="flex justify-between items-end">
-                        <span className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Sack Value</span>
-                        <span className="font-bold text-base leading-none text-slate-800">{currency} {valuePerSack.toLocaleString()}</span>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Date</span>
+                        <span className="font-mono font-bold text-[11px] text-slate-800 leading-none">{new Date().toISOString().split('T')[0]}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Denomination</span>
+                        <span className="font-bold text-[11px] text-slate-800 leading-none">{currency} {singleDenom.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center border-b border-slate-200 pb-1.5">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Notes / Sack</span>
+                        <span className="font-bold text-[11px] text-slate-800 leading-none">{(valuePerSack / singleDenom).toLocaleString()} pcs</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Value / Sack</span>
+                        <span className="font-bold text-[11px] text-slate-800 leading-none">{currency} {valuePerSack.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
