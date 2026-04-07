@@ -133,6 +133,7 @@ const WarehouseMapPage: React.FC = () => {
                   <div className="flex justify-between"><span className="text-muted-foreground">Duration Stored</span><span>{Math.max(0, Math.floor((new Date().getTime() - new Date(palletPkgs[0].arrivalDate).getTime()) / (1000 * 3600 * 24)))} days</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Denomination</span><span>{palletPkgs[0].currency} {palletPkgs[0].denominations[0]?.denomination.toLocaleString()}</span></div>
                   <div className="flex justify-between"><span className="text-muted-foreground">Notes per Sack</span><span>{palletPkgs[0].denominations[0]?.quantity.toLocaleString()} pcs</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Value per Sack</span><span>{palletPkgs[0].currency} {palletPkgs[0].totalValue.toLocaleString()}</span></div>
                 </>
               )}
               <div className="w-full h-2 bg-background rounded-full overflow-hidden">
