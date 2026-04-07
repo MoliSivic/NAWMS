@@ -196,7 +196,7 @@ const StockInPage: React.FC = () => {
             const pkgId = `PKG-${String(nextId).padStart(5, '0')}`;
             const pkgValue = valuePerSack;
             const pkgQuantity = valuePerSack / singleDenom;
-            
+
             mockPackages.push({
               packageId: pkgId,
               qrCode: `NBC-${pkgId}`,
@@ -221,7 +221,7 @@ const StockInPage: React.FC = () => {
               createdAt: new Date().toISOString(),
               notes: 'System Generated'
             });
-            
+
             existingPkgIds.add(pkgId);
             if (palletObj) {
               palletObj.packages.push(pkgId);
@@ -386,8 +386,8 @@ const StockInPage: React.FC = () => {
           {steps.map((s, i) => (
             <React.Fragment key={s}>
               <div className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all shrink-0 ${i === step ? 'bg-primary text-primary-foreground' :
-                  i < step ? 'bg-success/10 text-success' :
-                    'bg-muted text-muted-foreground'
+                i < step ? 'bg-success/10 text-success' :
+                  'bg-muted text-muted-foreground'
                 }`}>
                 {i < step ? <CheckCircle className="w-3 h-3" /> : <span className="w-4 text-center">{i + 1}</span>}
                 <span className="hidden sm:inline">{s}</span>
@@ -618,14 +618,14 @@ const StockInPage: React.FC = () => {
                 <div className="flex flex-col gap-3">
                   <div className="flex-1 bg-white border-2 border-slate-300 border-dashed rounded-lg flex flex-col items-center justify-center p-3 relative shadow-sm">
                     <div className="absolute top-0 w-full bg-slate-100 border-b border-slate-200 py-1.5 px-3 flex justify-between items-center rounded-t-lg">
-                       <span className="text-[9px] font-bold tracking-widest text-slate-500 uppercase">NBC Vault - Official Stamp</span>
-                       <QrCode className="w-3 h-3 text-slate-400" />
+                      <span className="text-[9px] font-bold tracking-widest text-slate-500 uppercase">NBC Vault - Official Stamp</span>
+                      <QrCode className="w-3 h-3 text-slate-400" />
                     </div>
-                    
+
                     <div className="mt-6 mb-3 p-2 border-2 border-slate-200 rounded-md bg-white">
                       <img src={qrCodeImg} alt="Master Pallet QR Code" className="w-40 h-40 object-contain mix-blend-multiply" />
                     </div>
-                    
+
                     <div className="w-full text-left space-y-1 bg-slate-50/50 p-2.5 rounded-md border border-slate-200">
                       <div className="flex justify-between items-center border-b border-slate-200 pb-1">
                         <span className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Package ID</span>
