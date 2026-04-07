@@ -23,6 +23,7 @@ const StockInPage: React.FC = () => {
   const [palletId, setPalletId] = useState('');
   const [robotStatus, setRobotStatus] = useState<'idle' | 'retrieving' | 'arrived' | 'storing' | 'completed' | 'emergency_stop'>('idle');
   const [retrievalPhase, setRetrievalPhase] = useState<'idle' | 'moving_to_shelf' | 'loading' | 'returning'>('idle');
+  const [storingPhase, setStoringPhase] = useState<'idle' | 'moving_to_shelf' | 'unloading' | 'returning'>('idle');
   const [isLabelAttached, setIsLabelAttached] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
@@ -101,7 +102,15 @@ const StockInPage: React.FC = () => {
       setRobotStatus('arrived');
       setRetrievalPhase('idle');
     }
-  }, [retrievalPhase]);
+
+    if (storingPhase === 'moving_to_shelf') {
+      setStoringPhase('unloading');
+      setTimeout(() => setStoringPhase('returning'), 4000);
+    } else if (storingPhase === 'returning') {
+      setRobotStatus('completed');
+      setStoringPhase('idle');
+    }
+  }, [retrievalPhase, storingPhase]);
 
   // Independent Printing Logic
   const handlePrintingDispatch = () => {
@@ -115,32 +124,13 @@ const StockInPage: React.FC = () => {
     handleRobotMovement();
   };
 
-  // Automated loading detection simulation
-  useEffect(() => {
-    if (step === 4 && !isLabelAttached) {
-      const timer = setTimeout(() => {
-        setIsLabelAttached(true);
-      }, 4000); // Simulate sensor detecting 40 sacks after 4 seconds
-      return () => clearTimeout(timer);
-    }
-  }, [step, isLabelAttached]);
+  // Automated loading detection simulation removed by user request.
 
   const handleStartDispatch = () => {
     if (robotStatus === 'emergency_stop') return;
     setRobotStatus('storing');
     setStep(5);
-    setCountdown(6);
-    // Simulate storage completion after 6 seconds
-    const timer = setInterval(() => {
-      setCountdown(prev => {
-        if (prev !== null && prev <= 1) {
-          clearInterval(timer);
-          setRobotStatus('completed');
-          return null;
-        }
-        return prev !== null ? prev - 1 : null;
-      });
-    }, 1000);
+    setStoringPhase('moving_to_shelf');
   };
 
   const handleEmergencyStop = () => {
@@ -177,12 +167,22 @@ const StockInPage: React.FC = () => {
     }
 
     if (robotStatus === 'storing') {
-      return {
-        robotId: 'ROB-002',
-        sourceLocation: 'Inbound Area',
-        targetLocation: suggestedLocation.locationId,
-        status: 'storing'
-      };
+      if (storingPhase === 'moving_to_shelf' || storingPhase === 'unloading') {
+        return {
+          robotId: 'ROB-002',
+          sourceLocation: 'Inbound Area',
+          targetLocation: suggestedLocation.locationId,
+          status: 'storing' // Moving TO shelf
+        };
+      } 
+      else if (storingPhase === 'returning') {
+        return {
+          robotId: 'ROB-002',
+          sourceLocation: suggestedLocation.locationId,
+          targetLocation: 'Inbound Area',
+          status: 'retrieving' // Moving BACK to Inbound Area
+        };
+      }
     }
     if (robotStatus === 'emergency_stop') {
       return {
@@ -198,7 +198,7 @@ const StockInPage: React.FC = () => {
       targetLocation: 'Inbound Area',
       status: 'idle'
     };
-  }, [step, robotStatus, suggestedLocation, retrievalPhase]);
+  }, [step, robotStatus, suggestedLocation, retrievalPhase, storingPhase]);
 
   return (
     <div className="min-h-[calc(100vh-120px)] flex flex-col items-center justify-start p-4 py-12">
