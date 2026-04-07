@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { mockPallets, mockShelfLocations, mockZones } from '@/data/mockData';
@@ -14,7 +14,7 @@ const StockInPage: React.FC = () => {
   const mode = 'single';
   const currency = 'KHR';
   const [singleDenom, setSingleDenom] = useState(100000);
-  const [singleQty, setSingleQty] = useState(1000); 
+  const [valuePerSack, setValuePerSack] = useState(100000000);
   const [packageCount, setPackageCount] = useState(40);
   
   const [source, setSource] = useState('Central Treasury');
@@ -22,12 +22,30 @@ const StockInPage: React.FC = () => {
 
   const [palletId, setPalletId] = useState('');
   const [robotStatus, setRobotStatus] = useState<'idle' | 'retrieving' | 'arrived' | 'storing' | 'completed' | 'emergency_stop'>('idle');
-  const [retrievalPhase, setRetrievalPhase] = useState<'idle' | 'moving_to_shelf' | 'returning'>('idle');
+  const [retrievalPhase, setRetrievalPhase] = useState<'idle' | 'moving_to_shelf' | 'loading' | 'returning'>('idle');
   const [isLabelAttached, setIsLabelAttached] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);
   const [countdown, setCountdown] = useState<number | null>(null);
+  const initialRetrievalTime = React.useRef(20);
 
-  const valuePerSack = useMemo(() => singleDenom * singleQty, [singleDenom, singleQty]);
+  // --- Sack Value Logic ---
+  // Each sack must contain only one denomination type.
+  // The total sack value is calculated as: denomination × number of notes.
+  // So 200,000 means 2 notes of 100,000, and 300,000 means 3 notes of 100,000.
+  const isValidSackValue = valuePerSack > 0 && valuePerSack % singleDenom === 0;
+  const lastValidNotesRef = React.useRef(1000);
+
+  useEffect(() => {
+    if (isValidSackValue) {
+      lastValidNotesRef.current = valuePerSack / singleDenom;
+    }
+  }, [valuePerSack, singleDenom, isValidSackValue]);
+
+  const handleDenomChange = (newDenom: number) => {
+    setSingleDenom(newDenom);
+    setValuePerSack(newDenom * lastValidNotesRef.current);
+  };
+
   const totalValue = useMemo(() => valuePerSack * packageCount, [valuePerSack, packageCount]);
 
   const khrDenoms = [100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 100];
@@ -66,34 +84,36 @@ const StockInPage: React.FC = () => {
     return null;
   }, [selectedPallet, suggestedPallet]);
 
-  // Robot simulation logic
-  useEffect(() => {
-    let timer: NodeJS.Timeout;
-    if (step === 3 && robotStatus === 'retrieving') {
-      // Total retrieval time is 20s (10s to shelf, 10s back)
-      timer = setInterval(() => {
-        setCountdown(prev => {
-          if (prev !== null && prev <= 1) {
-            clearInterval(timer);
-            setRobotStatus('arrived');
-            setRetrievalPhase('idle');
-            return null;
-          }
-          
-          if (prev !== null) {
-             const nextVal = prev - 1;
-             // Switch to returning phase halfway through
-             if (nextVal <= 10 && retrievalPhase === 'moving_to_shelf') {
-                setRetrievalPhase('returning');
-             }
-             return nextVal;
-          }
-          return null;
-        });
-      }, 1000);
-      return () => clearInterval(timer);
+  // Independent Robot simulation logic
+  const handleRobotMovement = () => {
+    setRobotStatus('retrieving');
+    setRetrievalPhase('moving_to_shelf');
+  };
+
+  const handleLiveTaskArrival = useCallback(() => {
+    if (retrievalPhase === 'moving_to_shelf') {
+      // Robot physically arrived at the shelf.
+      setRetrievalPhase('loading');
+      // Simulate taking the pallet for 4 seconds
+      setTimeout(() => setRetrievalPhase('returning'), 4000);
+    } else if (retrievalPhase === 'returning') {
+      // Robot physically arrived back at the door perfectly.
+      setRobotStatus('arrived');
+      setRetrievalPhase('idle');
     }
-  }, [step, robotStatus, retrievalPhase]);
+  }, [retrievalPhase]);
+
+  // Independent Printing Logic
+  const handlePrintingDispatch = () => {
+    setIsPrinting(true); 
+    const printDelay = Math.floor(Math.random() * 2000) + 2000;
+    setTimeout(() => setIsPrinting(false), printDelay); 
+  };
+
+  const handleStartProtocol = () => {
+    handlePrintingDispatch();
+    handleRobotMovement();
+  };
 
   // Automated loading detection simulation
   useEffect(() => {
@@ -137,9 +157,8 @@ const StockInPage: React.FC = () => {
     if (!suggestedLocation) return null;
     
     // Retrieval logic for Step 3
-    if (step === 3 && robotStatus === 'retrieving' && countdown !== null) {
-      // 20s to 11s: Moving from Door to Shelf
-      if (countdown > 10) {
+    if (step === 3 && robotStatus === 'retrieving') {
+      if (retrievalPhase === 'moving_to_shelf' || retrievalPhase === 'loading') {
         return {
           robotId: 'ROB-002',
           sourceLocation: 'Inbound Area',
@@ -147,8 +166,7 @@ const StockInPage: React.FC = () => {
           status: 'storing' // Moving TO shelf
         };
       } 
-      // 10s to 1s: Moving from Shelf back to Door
-      else {
+      else if (retrievalPhase === 'returning') {
         return {
           robotId: 'ROB-002',
           sourceLocation: suggestedLocation.locationId,
@@ -259,14 +277,29 @@ const StockInPage: React.FC = () => {
               <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1">Denomination</label>
-                  <Select value={String(singleDenom)} onValueChange={(v) => setSingleDenom(Number(v))}>
+                  <Select value={String(singleDenom)} onValueChange={(v) => handleDenomChange(Number(v))}>
                     <SelectTrigger className="h-9 text-sm bg-background font-mono"><SelectValue /></SelectTrigger>
                     <SelectContent>{khrDenoms.map(d => (<SelectItem key={d} value={String(d)}>{d.toLocaleString()}</SelectItem>))}</SelectContent>
                   </Select>
                 </div>
                 <div>
-                  <label className="block text-xs text-muted-foreground mb-1">Pieces / Sack</label>
-                  <input type="number" value={singleQty} onChange={e => setSingleQty(Number(e.target.value))} className="w-full h-9 px-3 border rounded text-sm bg-background font-mono" />
+                  <label className="block text-xs text-muted-foreground mb-1">Value per Sack ({currency})</label>
+                  <input 
+                    type="number" 
+                    step={singleDenom}
+                    min={singleDenom}
+                    value={valuePerSack} 
+                    onChange={e => setValuePerSack(Number(e.target.value))} 
+                    onBlur={() => {
+                      let corrected = valuePerSack;
+                      if (corrected < singleDenom) corrected = singleDenom;
+                      else if (corrected % singleDenom !== 0) {
+                        corrected = Math.max(singleDenom, Math.round(corrected / singleDenom) * singleDenom);
+                      }
+                      setValuePerSack(corrected);
+                    }}
+                    className="w-full h-9 px-3 border rounded text-sm bg-background font-mono" 
+                  />
                 </div>
                 <div>
                   <label className="block text-xs text-muted-foreground mb-1">Number of Sacks (Max 40)</label>
@@ -284,11 +317,7 @@ const StockInPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <div className="p-4 bg-muted/30 rounded border text-center">
-                  <p className="text-[10px] font-bold uppercase text-muted-foreground mb-1">Value per Sack</p>
-                  <p className="text-xl font-semibold">{currency} {valuePerSack.toLocaleString()}</p>
-                </div>
+              <div className="pt-2">
                 <div className="p-4 bg-navy-50 rounded border border-navy-100 text-center">
                   <p className="text-[10px] font-bold uppercase text-primary mb-1">Total Pallet Entry Value</p>
                   <p className="text-xl font-bold text-primary">{currency} {totalValue.toLocaleString()}</p>
@@ -297,7 +326,7 @@ const StockInPage: React.FC = () => {
             </div>
             <div className="flex justify-between pt-2">
               <Button size="sm" variant="outline" onClick={() => setStep(0)}>Back</Button>
-              <Button size="sm" onClick={() => setStep(2)}>Pallet Selection <ArrowRight className="w-3 h-3 ml-1" /></Button>
+              <Button size="sm" onClick={() => setStep(2)} disabled={!isValidSackValue}>Pallet Selection <ArrowRight className="w-3 h-3 ml-1" /></Button>
             </div>
           </div>
         )}
@@ -418,13 +447,7 @@ const StockInPage: React.FC = () => {
                   size="sm" 
                   className="w-full" 
                   disabled={isPrinting || robotStatus !== 'idle'} 
-                  onClick={() => { 
-                    setIsPrinting(true); 
-                    setRobotStatus('retrieving');
-                    setRetrievalPhase('moving_to_shelf');
-                    setCountdown(20);
-                    setTimeout(() => setIsPrinting(false), 2000); 
-                  }}
+                  onClick={handleStartProtocol}
                 >
                   <Printer className="w-3.5 h-3.5 mr-2" /> {isPrinting ? 'Printing...' : 'Print Identity Batch'}
                 </Button>
@@ -577,6 +600,7 @@ const StockInPage: React.FC = () => {
             <WarehouseCanvas 
               selectedSlotId={suggestedLocation?.locationId ?? null}
               liveTask={liveTask}
+              onLiveTaskArrival={handleLiveTaskArrival}
               onSlotClick={(slot) => {
                 if (step < 3 && slot.palletId) setPalletId(slot.palletId);
               }}

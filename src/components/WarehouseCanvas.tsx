@@ -23,6 +23,7 @@ interface CanvasRobot extends Robot {
   routeDir: 1 | -1;
   /** If true, the robot is following a live task and won't ping-pong */
   isLive?: boolean;
+  hasArrived?: boolean;
 }
 
 interface SlotInfo {
@@ -54,6 +55,7 @@ export interface WarehouseCanvasProps {
   selectedSlotId?: string | null;
   className?: string;
   liveTask?: LiveTask | null;
+  onLiveTaskArrival?: () => void;
 }
 
 // ─── Helpers ───
@@ -189,6 +191,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
   selectedSlotId,
   className,
   liveTask,
+  onLiveTaskArrival,
 }) => {
   const controlPalette = getMapControlPalette();
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -331,6 +334,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           routeIdx: 0,
           routeDir: 1,
           isLive: false,
+          hasArrived: false,
           status: r.status
         };
       }
@@ -359,7 +363,9 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
         routeIdx,
         routeDir: 1,
         isLive: liveTask?.robotId === r.robotId,
-        status: liveTask?.robotId === r.robotId && liveTask.status !== 'idle' ? 'active' : r.status
+        hasArrived: false,
+        status: liveTask?.robotId === r.robotId && liveTask.status !== 'idle' ? 'active' : r.status,
+        currentSpeed: liveTask?.robotId === r.robotId ? 8.0 : r.currentSpeed
       };
     });
   }, [liveTask]);
@@ -418,11 +424,17 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           if (distToTarget < 0.01) {
             rb.displayX = rb.targetX;
             rb.displayY = rb.targetY;
+            const originalRouteIdx = rb.routeIdx;
             advanceRoute(rb);
             if (
               distance(rb.displayX, rb.displayY, rb.targetX, rb.targetY) < 0.01
-            )
+            ) {
+              if (rb.isLive && rb.routeIdx === originalRouteIdx && !rb.hasArrived) {
+                rb.hasArrived = true;
+                if (onLiveTaskArrival) onLiveTaskArrival();
+              }
               break;
+            }
             continue;
           }
 
