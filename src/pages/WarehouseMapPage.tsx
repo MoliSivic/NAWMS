@@ -136,9 +136,9 @@ const WarehouseMapPage: React.FC = () => {
                 </>
               )}
               <div className="w-full h-2 bg-background rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-colors ${selectedSlot.occupancy >= 0.9 ? 'bg-success' :
-                    selectedSlot.occupancy >= 0.5 ? 'bg-info' :
-                      selectedSlot.occupancy >= 0.3 ? 'bg-warning' : 'bg-destructive'
+                <div className={`h-full rounded-full transition-colors ${selectedSlot.occupancy > 0.8 ? 'bg-destructive' :
+                    selectedSlot.occupancy >= 0.5 ? 'bg-warning' :
+                      selectedSlot.occupancy > 0 ? 'bg-success' : 'bg-muted'
                   }`} style={{ width: `${selectedSlot.occupancy * 100}%` }} />
               </div>
               {palletPkgs.length > 0 && (

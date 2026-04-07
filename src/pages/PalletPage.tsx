@@ -28,7 +28,7 @@ const PalletPage: React.FC = () => {
                   <td className="p-3">{mockZones.find(z => z.zoneId === p.zoneId)?.zoneName.split('—')[0]}</td>
                   <td className="p-3 font-mono">{p.locationCode}</td>
                   <td className="p-3">{p.currentPackageCount}/{p.maxCapacity}</td>
-                  <td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden"><div className={`h-full rounded-full ${fill >= 0.9 ? 'bg-success' : fill >= 0.5 ? 'bg-info' : fill >= 0.25 ? 'bg-warning' : 'bg-destructive'}`} style={{ width: `${fill * 100}%` }} /></div><span className="text-[10px]">{Math.round(fill * 100)}%</span></div></td>
+                  <td className="p-3"><div className="flex items-center gap-2"><div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden"><div className={`h-full rounded-full ${fill >= 0.9 ? 'bg-success' : fill >= 0.5 ? 'bg-info' : fill >= 0.3 ? 'bg-warning' : 'bg-destructive'}`} style={{ width: `${fill * 100}%` }} /></div><span className="text-[10px]">{Math.round(fill * 100)}%</span></div></td>
                   <td className="p-3"><span className={`px-2 py-0.5 rounded text-[10px] font-medium ${p.status === 'in-use' ? 'bg-green-50 text-green-700' : p.status === 'available' ? 'bg-blue-50 text-blue-700' : p.status === 'maintenance' ? 'bg-red-50 text-red-700' : 'bg-amber-50 text-amber-700'}`}>{p.status}</span></td>
                 </tr>);
             })}</tbody>

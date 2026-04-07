@@ -10,7 +10,7 @@ const InventoryPage: React.FC = () => {
   const filtered = mockPackages.filter(p =>
     (statusFilter === 'all' || p.status === statusFilter) &&
     (p.packageId.toLowerCase().includes(search.toLowerCase()) || p.palletId.toLowerCase().includes(search.toLowerCase()))
-  ).slice(0, 30);
+  );
 
   const detail = selected ? mockPackages.find(p => p.packageId === selected) : null;
 
@@ -79,7 +79,7 @@ const InventoryPage: React.FC = () => {
               </div>
               <div>
                 <p className="font-medium mb-2">Denomination Breakdown</p>
-                <table className="w-full text-[10px]"><thead><tr className="border-b"><th className="text-left py-1">Currency</th><th className="text-left py-1">Denom</th><th className="text-right py-1">Qty</th><th className="text-right py-1">Subtotal</th></tr></thead>
+                <table className="w-full text-[10px]"><thead><tr className="border-b"><th className="text-left py-1">Currency</th><th className="text-left py-1">Denomination</th><th className="text-right py-1">Notes per Sack</th><th className="text-right py-1">Subtotal</th></tr></thead>
                   <tbody>{detail.denominations.map((d, i) => (
                     <tr key={i} className="border-b"><td className="py-1">{d.currency}</td><td className="py-1">{d.denomination.toLocaleString()}</td><td className="py-1 text-right">{d.quantity}</td><td className="py-1 text-right">{d.subtotal.toLocaleString()}</td></tr>
                   ))}</tbody>

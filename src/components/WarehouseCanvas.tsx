@@ -124,11 +124,11 @@ function initRobotPos(r: Robot): { x: number; y: number } {
 function robotColor(status: Robot["status"]): string {
   switch (status) {
     case "active":
-      return "#22c55e";
-    case "idle":
-      return "#f59e0b";
-    case "charging":
       return "#3b82f6";
+    case "idle":
+      return "#9ca3af";
+    case "charging":
+      return "#0ea5e9";
     case "error":
       return "#ef4444";
     case "maintenance":
@@ -157,10 +157,10 @@ function getCanvasPalette() {
     shelfLabel: '#475569',
     slotEmpty: '#f8fafc',
     slotPalletOnly: '#cbd5e1',
-    slotHigh: '#16a34a',
-    slotMed: '#3b82f6',
-    slotLow: '#f59e0b',
-    slotCrit: '#ef4444',
+    slotFull: '#ef4444',
+    slotHalf: '#f59e0b',
+    slotLow: '#10b981',
+    slotActiveJob: '#3b82f6',
     slotSelected: '#2563eb',
     robotStroke: '#fff',
     robotLabel: '#fff',
@@ -641,12 +641,19 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           }
         }
 
-        if (slotPalletId) {
+        let isTaskTarget = false;
+        if (liveTask && liveTask.status !== 'idle') {
+          if (liveTask.status === 'storing' && slot.locationId === liveTask.targetLocation) isTaskTarget = true;
+          if (liveTask.status === 'retrieving' && slot.locationId === liveTask.sourceLocation) isTaskTarget = true;
+        }
+
+        if (isTaskTarget) {
+          fill = p.slotActiveJob;
+        } else if (slotPalletId) {
           if (slotOccupancy === 0) fill = p.slotPalletOnly;
-          else if (slotOccupancy >= 0.9) fill = p.slotHigh;
-          else if (slotOccupancy >= 0.5) fill = p.slotMed;
-          else if (slotOccupancy >= 0.3) fill = p.slotLow;
-          else fill = p.slotCrit;
+          else if (slotOccupancy > 0.8) fill = p.slotFull;
+          else if (slotOccupancy >= 0.5) fill = p.slotHalf;
+          else fill = p.slotLow;
         }
 
         const isSelected = selectedSlotId === slot.locationId;
