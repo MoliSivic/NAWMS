@@ -643,7 +643,8 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
 
         if (slotPalletId) {
           if (slotOccupancy === 0) fill = p.slotPalletOnly;
-          else if (slotOccupancy >= 0.75) fill = p.slotMed;
+          else if (slotOccupancy >= 0.9) fill = p.slotHigh;
+          else if (slotOccupancy >= 0.5) fill = p.slotMed;
           else if (slotOccupancy >= 0.3) fill = p.slotLow;
           else fill = p.slotCrit;
         }
