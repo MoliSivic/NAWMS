@@ -213,17 +213,23 @@ const StockOutPage: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center justify-center sm:justify-start gap-2 overflow-x-auto pb-2 scrollbar-hide">
+        <div className="stock-out-steps flex items-center justify-center sm:justify-start gap-2 overflow-x-auto pb-2">
           {steps.map((label, i) => (
             <React.Fragment key={label}>
               <div
                 className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
                   i === step
                     ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
+                    : i < step
+                      ? "bg-success/10 text-success"
+                      : "bg-muted text-muted-foreground"
                 }`}
               >
-                <span className="w-4 text-center">{i + 1}</span>
+                {i < step ? (
+                  <CheckCircle className="w-3 h-3" />
+                ) : (
+                  <span className="w-4 text-center">{i + 1}</span>
+                )}
                 <span className="hidden sm:inline">{label}</span>
               </div>
               {i < steps.length - 1 && (
