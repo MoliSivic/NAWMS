@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { mockPallets, mockShelfLocations, mockZones, mockPackages } from '@/data/mockData';
 import { warehouseLayout } from '@/data/warehouseLayout';
 import { CheckCircle, Printer, QrCode, ArrowRight, MapPin, ShieldCheck, Box, Loader2, ScanLine, Check, XCircle } from 'lucide-react';
+import { toast } from "@/hooks/use-toast";
 import WarehouseCanvas, { LiveTask } from '@/components/WarehouseCanvas';
 import qrCodeImg from '@/assets/qr-code.png';
 
@@ -487,7 +488,15 @@ const StockInPage: React.FC = () => {
                       value={packageCount === 0 ? '' : packageCount}
                       onChange={e => {
                         const val = e.target.value === '' ? 0 : Number(e.target.value);
-                        if (val <= 40) setPackageCount(val);
+                        if (val <= 40) {
+                          setPackageCount(val);
+                        } else {
+                          toast({
+                            title: "Invalid Input",
+                            description: "Maximum number of sacks per pallet is 40.",
+                            variant: "destructive"
+                          });
+                        }
                       }}
                       className="w-full h-9 px-3 border rounded text-sm bg-background font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
