@@ -100,9 +100,9 @@ const StockOutPage: React.FC = () => {
     "nawms_so_countdown",
     null,
   );
-  const [previewTripIndex, setPreviewTripIndex] = useState(0);
-  const [previewTripLeg, setPreviewTripLeg] = useState<"outbound" | "return">(
-    "outbound",
+  const [retrievalPalletIndex, setRetrievalPalletIndex] = useSessionState(
+    "nawms_so_retrievalPalletIndex",
+    0,
   );
 
   const denominationOptions = useMemo(() => {
@@ -134,6 +134,8 @@ const StockOutPage: React.FC = () => {
     () => parseDenominationRequest(denomReq),
     [denomReq],
   );
+  const requestedPackageCount = Math.max(0, Number(pkgCount) || 0);
+  const isPackageCountValid = requestedPackageCount >= 1;
 
   const valuePerSackOptions = useMemo(() => {
     const matchingValues = new Set<number>();
@@ -172,6 +174,10 @@ const StockOutPage: React.FC = () => {
 
   // FIFO selection respecting request type
   const selectedPkgs = useMemo(() => {
+    if (!isPackageCountValid) {
+      return [];
+    }
+
     const stored = mockPackages
       .filter((p) => p.status === "stored")
       .sort(
@@ -189,11 +195,15 @@ const StockOutPage: React.FC = () => {
         (valuePerSack === 0 || p.totalValue === valuePerSack),
     );
 
-    return matching.slice(0, Number(pkgCount) || 5);
-  }, [pkgCount, selectedDenomination, valuePerSack]);
+    return matching.slice(0, requestedPackageCount);
+  }, [
+    isPackageCountValid,
+    requestedPackageCount,
+    selectedDenomination,
+    valuePerSack,
+  ]);
 
   const totalSelectedValue = selectedPkgs.reduce((s, p) => s + p.totalValue, 0);
-  const requestedPackageCount = Number(pkgCount) || 0;
   const totalRequestValue = valuePerSack * requestedPackageCount;
   const missingPackageCount = Math.max(0, requestedPackageCount - selectedPkgs.length);
 
@@ -243,25 +253,8 @@ const StockOutPage: React.FC = () => {
   }, [selectedPkgs]);
 
   const theoreticalMinPallets = Math.ceil(requestedPackageCount / 40);
-  const activePreviewPallet = selectedPalletGroups[previewTripIndex] || null;
-  const previewLiveTask =
-    step === 1 && activePreviewPallet
-      ? {
-          robotId: "ROB-002",
-          sourceLocation:
-            previewTripLeg === "outbound"
-              ? "Inbound Area"
-              : activePreviewPallet.locationCode,
-          targetLocation:
-            previewTripLeg === "outbound"
-              ? activePreviewPallet.locationCode
-              : "Inbound Area",
-          status:
-            previewTripLeg === "outbound"
-              ? ("storing" as const)
-              : ("retrieving" as const),
-        }
-      : null;
+  const currentRetrievalPallet =
+    selectedPalletGroups[retrievalPalletIndex] || null;
 
   const selectedScanTargets = useMemo(() => {
     const targets = new Map<string, string>();
@@ -290,39 +283,30 @@ const StockOutPage: React.FC = () => {
     selectedPkgs.length > 0 &&
     selectedPkgs.every((pkg) => scanList.includes(pkg.packageId));
 
-  useEffect(() => {
-    if (step !== 1 || selectedPalletGroups.length === 0) {
-      setPreviewTripIndex(0);
-      setPreviewTripLeg("outbound");
-      return;
-    }
-
-    if (previewTripIndex >= selectedPalletGroups.length) {
-      setPreviewTripIndex(0);
-      setPreviewTripLeg("outbound");
-    }
-  }, [previewTripIndex, selectedPalletGroups.length, step]);
-
-  const handlePreviewTripArrival = useCallback(() => {
-    if (selectedPalletGroups.length === 0) return;
-
-    if (previewTripLeg === "outbound") {
-      setPreviewTripLeg("return");
-      return;
-    }
-
-    setPreviewTripIndex((current) => (current + 1) % selectedPalletGroups.length);
-    setPreviewTripLeg("outbound");
-  }, [previewTripLeg, selectedPalletGroups.length]);
-
   const handleLiveTaskArrival = useCallback(() => {
     if (retrievalPhase === "moving_to_shelf") {
       setRetrievalPhase("loading");
     } else if (retrievalPhase === "returning") {
-      setRobotStatus("arrived");
-      setRetrievalPhase("idle");
+      const isLastPallet =
+        retrievalPalletIndex >= selectedPalletGroups.length - 1;
+
+      if (isLastPallet) {
+        setRobotStatus("arrived");
+        setRetrievalPhase("idle");
+        return;
+      }
+
+      setRetrievalPalletIndex((current) => current + 1);
+      setRetrievalPhase("moving_to_shelf");
     }
-  }, [retrievalPhase, setRetrievalPhase, setRobotStatus]);
+  }, [
+    retrievalPalletIndex,
+    retrievalPhase,
+    selectedPalletGroups.length,
+    setRetrievalPalletIndex,
+    setRetrievalPhase,
+    setRobotStatus,
+  ]);
 
   useEffect(() => {
     let t: string | number | NodeJS.Timeout | undefined;
@@ -334,7 +318,7 @@ const StockOutPage: React.FC = () => {
 
   const liveTask: LiveTask | null = useMemo(() => {
     if (robotStatus === "idle" || robotStatus === "arrived") return null;
-    const targetLocation = selectedPkgs[0]?.locationCode || "A1-01"; // Targeting the first package's location
+    const targetLocation = currentRetrievalPallet?.locationCode || "A1-01";
 
     if (retrievalPhase === "moving_to_shelf" || retrievalPhase === "loading") {
       return {
@@ -353,7 +337,7 @@ const StockOutPage: React.FC = () => {
       };
     }
     return null;
-  }, [robotStatus, retrievalPhase, selectedPkgs]);
+  }, [currentRetrievalPallet, retrievalPhase, robotStatus]);
 
   const confirmRelease = () => {
     if (!allScanned) return;
@@ -418,10 +402,16 @@ const StockOutPage: React.FC = () => {
     setVerified(false);
     setRobotStatus("idle");
     setRetrievalPhase("idle");
+    setRetrievalPalletIndex(0);
   };
 
   const handleStartDispatch = () => {
+    if (selectedPalletGroups.length === 0) return;
+
     setSubmitted(true);
+    setScanList([]);
+    setVerified(false);
+    setRetrievalPalletIndex(0);
     setRobotStatus("retrieving");
     setRetrievalPhase("moving_to_shelf");
     setStep(3);
@@ -528,10 +518,29 @@ const StockOutPage: React.FC = () => {
                     type="number"
                     min="1"
                     placeholder="0"
-                    value={pkgCount === "0" || pkgCount === "" ? "" : pkgCount}
-                    onChange={(e) => setPkgCount(e.target.value)}
+                    value={pkgCount}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+
+                      if (nextValue === "") {
+                        setPkgCount("");
+                        return;
+                      }
+
+                      setPkgCount(String(Math.max(0, Number(nextValue) || 0)));
+                    }}
+                    onBlur={() => {
+                      if (pkgCount === "") {
+                        setPkgCount("0");
+                      }
+                    }}
                     className="w-full px-3 py-2 border rounded-md text-sm bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
                   />
+                  {!isPackageCountValid && (
+                    <p className="mt-1 text-[11px] text-red-500">
+                      Number of packages must be at least 1.
+                    </p>
+                  )}
                 </div>
 
                 <div className="col-span-3">
@@ -561,6 +570,7 @@ const StockOutPage: React.FC = () => {
                 <Button 
                   size="sm" 
                   onClick={() => setStep(1)}
+                  disabled={!isPackageCountValid}
                   className="px-6 h-10 shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
                   Analyze & Select Packages <ArrowRight className="w-4 h-4 ml-2" />
@@ -751,7 +761,8 @@ const StockOutPage: React.FC = () => {
                     </p>
                     <p className="mt-1 text-sm font-semibold text-foreground">
                       Need {requestedPackageCount} sacks x {selectedDenomination.currency}{" "}
-                      {valuePerSack.toLocaleString()}
+                      {valuePerSack.toLocaleString()} = {selectedDenomination.currency}{" "}
+                      {totalRequestValue.toLocaleString()}
                     </p>
                     <p className="mt-1 text-[11px] text-muted-foreground">
                       Requested outbound quantity and per-sack value
@@ -823,37 +834,164 @@ const StockOutPage: React.FC = () => {
 
           {step === 2 && (
             <div className="space-y-4 animate-in slide-in-from-right-2 duration-300">
-              <h2 className="text-sm font-medium">
-                Confirm & Dispatch Workflow
-              </h2>
-
-              <div className="p-4 bg-muted/50 rounded border space-y-3">
-                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                  Dispatch Summary
-                </h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-background p-3 rounded border shadow-sm">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Packages to Verify
-                    </p>
-                    <p className="text-2xl font-bold font-mono text-foreground">
-                      {selectedPkgs.length}
-                    </p>
-                  </div>
-                  <div className="bg-background p-3 rounded border shadow-sm">
-                    <p className="text-[10px] text-muted-foreground uppercase">
-                      Total Outbound Value
-                    </p>
-                    <p className="text-2xl font-bold font-mono text-primary">
-                      USD {totalSelectedValue.toLocaleString()}
-                    </p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium">
+                  Confirm & Dispatch
+                </h2>
+                <div
+                  className={`px-2 py-1 rounded border text-[10px] font-bold uppercase tracking-wider ${
+                    missingPackageCount > 0
+                      ? "bg-amber-50 border-warning/20 text-warning"
+                      : "bg-green-50 border-success/20 text-success"
+                  }`}
+                >
+                  {missingPackageCount > 0
+                    ? "Partial Dispatch"
+                    : "Full Request Available"}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Please confirm the request before dispatching the automated
-                  retrieval sequence. Ensure Outbound Area is clear for robot
-                  drop-off.
-                </p>
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 overflow-hidden">
+                <div className="border-b bg-muted/40 px-4 py-3">
+                  <h3 className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                    Dispatch Scope
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Review what the robot will retrieve in this outbound run based on the current FIFO match.
+                  </p>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  <div className="grid grid-cols-4 gap-3">
+                    <div className="rounded-md border bg-background p-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Requested
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-foreground">
+                        {requestedPackageCount}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        sacks needed
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-background p-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Dispatch Now
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-primary">
+                        {selectedPkgs.length}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        sacks available
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-background p-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Pallets
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-foreground">
+                        {selectedPalletGroups.length}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        robot retrieval cycles
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-background p-3 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Remaining
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-warning">
+                        {missingPackageCount}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground">
+                        sacks still missing
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-md border bg-background p-4 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Operator Request
+                      </p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">
+                        {requestedPackageCount} sacks x {selectedDenomination.currency}{" "}
+                        {valuePerSack.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Requested total: {selectedDenomination.currency}{" "}
+                        {totalRequestValue.toLocaleString()}
+                      </p>
+                    </div>
+                    <div className="rounded-md border bg-background p-4 shadow-sm">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                        Dispatch In This Run
+                      </p>
+                      <p className="mt-2 text-sm font-semibold text-foreground">
+                        {selectedPkgs.length} sacks = {selectedDenomination.currency}{" "}
+                        {totalSelectedValue.toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">
+                        Current FIFO-matched stock to be retrieved now
+                      </p>
+                    </div>
+                  </div>
+
+                  {selectedPalletGroups.length > 0 && (
+                    <div className="rounded-md border bg-background p-4 shadow-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                            Robot Dispatch Queue
+                          </p>
+                          <p className="mt-1 text-[11px] text-muted-foreground">
+                            The robot will retrieve these pallets one cycle at a time and return each load to the inbound area.
+                          </p>
+                        </div>
+                        <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                          {selectedPalletGroups.length} pallets
+                        </div>
+                      </div>
+
+                      <div className="mt-3 space-y-2">
+                        {selectedPalletGroups.map((group, index) => (
+                          <div
+                            key={group.palletId}
+                            className="flex items-center justify-between gap-4 rounded-md border bg-muted/20 px-3 py-2"
+                          >
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Trip {index + 1}: {group.palletId}
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                {group.locationCode} {"->"} Inbound Area
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-sm font-semibold text-primary">
+                                {group.packageCount} sacks
+                              </p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                {selectedDenomination.currency}{" "}
+                                {group.totalValue.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {missingPackageCount > 0 ? (
+                    <div className="rounded-md border border-warning/20 bg-amber-50 px-4 py-3 text-xs text-warning">
+                      FIFO currently found only {selectedPkgs.length} of {requestedPackageCount} requested sacks. This dispatch will proceed with the available stock now, and {missingPackageCount} sacks remain unfulfilled.
+                    </div>
+                  ) : (
+                    <div className="rounded-md border border-success/20 bg-green-50 px-4 py-3 text-xs text-success">
+                      The full outbound request is available. Dispatch will proceed with all requested sacks under FIFO rules.
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex justify-between pt-2">
@@ -863,9 +1001,10 @@ const StockOutPage: React.FC = () => {
                 <Button
                   size="sm"
                   onClick={handleStartDispatch}
+                  disabled={selectedPkgs.length === 0}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                 >
-                  Confirm & Dispatch Robot{" "}
+                  Dispatch {selectedPkgs.length} Available Sacks{" "}
                   <ArrowRight className="w-3 h-3 ml-1" />
                 </Button>
               </div>
