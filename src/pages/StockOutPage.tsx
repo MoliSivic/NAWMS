@@ -213,6 +213,10 @@ const StockOutPage: React.FC = () => {
   const totalSelectedValue = selectedPkgs.reduce((s, p) => s + p.totalValue, 0);
   const totalRequestValue = valuePerSack * requestedPackageCount;
   const missingPackageCount = Math.max(0, requestedPackageCount - selectedPkgs.length);
+  const remainingWarehousePackageCount = Math.max(
+    0,
+    availablePackageCount - selectedPkgs.length,
+  );
 
   const selectedPalletGroups = useMemo(() => {
     const groups = new Map<
@@ -756,52 +760,6 @@ const StockOutPage: React.FC = () => {
                 )}
               </div>
 
-              <div className="p-4 bg-navy-50 border border-navy-100 rounded text-primary space-y-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary/80">
-                      Available Under FIFO
-                    </p>
-                    <p className="mt-1 text-xs text-primary/70">
-                      Stock that can be dispatched now using the oldest matching sacks first
-                    </p>
-                  </div>
-                  <span className="text-2xl font-bold leading-none">
-                    {selectedPkgs.length} sacks = {selectedDenomination.currency}{" "}
-                    {totalSelectedValue.toLocaleString()}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-md border border-primary/15 bg-white/60 px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
-                      Operator Request
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">
-                      Need {requestedPackageCount} sacks x {selectedDenomination.currency}{" "}
-                      {valuePerSack.toLocaleString()} = {selectedDenomination.currency}{" "}
-                      {totalRequestValue.toLocaleString()}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Requested outbound quantity and per-sack value
-                    </p>
-                  </div>
-
-                  <div className="rounded-md border border-primary/15 bg-white/60 px-3 py-2">
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
-                      Available Now
-                    </p>
-                    <p className="mt-1 text-sm font-semibold text-foreground">
-                      {selectedPkgs.length} sacks = {selectedDenomination.currency}{" "}
-                      {totalSelectedValue.toLocaleString()}
-                    </p>
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      Matching sacks currently available in storage under FIFO rules
-                    </p>
-                  </div>
-                </div>
-              </div>
-
               {missingPackageCount > 0 && (
                 <div className="p-3 bg-red-50 border border-red-200 rounded text-xs flex items-center gap-2">
                   <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
@@ -916,13 +874,13 @@ const StockOutPage: React.FC = () => {
                     </div>
                     <div className="rounded-md border bg-background p-3 shadow-sm">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-                        Remaining
+                        Remaining in Warehouse
                       </p>
-                      <p className="mt-1 text-2xl font-bold text-warning">
-                        {missingPackageCount}
+                      <p className="mt-1 text-2xl font-bold text-foreground">
+                        {remainingWarehousePackageCount}
                       </p>
                       <p className="text-[11px] text-muted-foreground">
-                        sacks still missing
+                        sacks left in warehouse
                       </p>
                     </div>
                   </div>
