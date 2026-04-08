@@ -43,12 +43,11 @@ const steps = [
 const StockOutPage: React.FC = () => {
   const [step, setStep] = useSessionState("nawms_so_step", 0);
   const [requestType, setRequestType] = useSessionState<
-    "amount" | "packages" | "denomination"
-  >("nawms_so_reqType", "amount");
-  const [amount, setAmount] = useSessionState("nawms_so_amount", "250000");
+    "denomination"
+  >("nawms_so_reqType", "denomination");
   const [denomReq, setDenomReq] = useSessionState(
     "nawms_so_denomReq",
-    "USD 100",
+    "KHR 100000",
   );
   const [pkgCount, setPkgCount] = useSessionState("nawms_so_pkgCount", "0");
   const [submitted, setSubmitted] = useSessionState(
@@ -82,34 +81,19 @@ const StockOutPage: React.FC = () => {
           new Date(a.arrivalDate).getTime() - new Date(b.arrivalDate).getTime(),
       );
 
-    if (requestType === "amount") {
-      const target = Number(amount) || 0;
-      const result: typeof stored = [];
-      let running = 0;
-      for (const pkg of stored) {
-        if (running >= target) break;
-        result.push(pkg);
-        running += pkg.totalValue;
-      }
-      return result;
-    }
-
-    if (requestType === "denomination") {
-      const parts = denomReq.trim().split(/\s+/);
-      const cur = parts[0]?.toUpperCase() || "USD";
-      const denomVal = Number(parts[1]) || 0;
-      const matching = stored.filter(
-        (p) =>
-          p.currency === cur &&
-          (denomVal === 0 ||
-            p.denominations.some((d) => d.denomination === denomVal)),
-      );
-      return matching.slice(0, Number(pkgCount) || 5);
-    }
-
-    // requestType === 'packages'
-    return stored.slice(0, Number(pkgCount) || 5);
-  }, [requestType, amount, denomReq, pkgCount]);
+    const parts = denomReq.trim().split(/\s+/);
+    const cur = parts[0]?.toUpperCase() || "KHR";
+    const denomVal = Number(parts[1]) || 0;
+    
+    const matching = stored.filter(
+      (p) =>
+        p.currency === cur &&
+        (denomVal === 0 ||
+          p.denominations.some((d) => d.denomination === denomVal)),
+    );
+    
+    return matching.slice(0, Number(pkgCount) || 5);
+  }, [denomReq, pkgCount]);
 
   const totalSelectedValue = selectedPkgs.reduce((s, p) => s + p.totalValue, 0);
 
@@ -201,8 +185,7 @@ const StockOutPage: React.FC = () => {
 
   const clearSession = () => {
     setStep(0);
-    setRequestType("amount");
-    setAmount("250000");
+    setDenomReq("KHR 100000");
     setPkgCount("0");
     setSubmitted(false);
     setScanList([]);
@@ -230,50 +213,58 @@ const StockOutPage: React.FC = () => {
           </p>
         </div>
 
+        <div className="flex items-center justify-center sm:justify-start gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          {steps.map((label, i) => (
+            <React.Fragment key={label}>
+              <div
+                className={`flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-all shrink-0 whitespace-nowrap ${
+                  i === step
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-muted text-muted-foreground"
+                }`}
+              >
+                <span className="w-4 text-center">{i + 1}</span>
+                <span className="hidden sm:inline">{label}</span>
+              </div>
+              {i < steps.length - 1 && (
+                <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0" />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+
         <div className="bg-card rounded-lg border p-6 animate-fade-in w-full shadow-sm">
           {step === 0 && (
-            <div className="space-y-4">
-              <h2 className="text-sm font-medium">Request Details</h2>
-              <div className="flex gap-2 mb-4">
-                {(["amount", "packages", "denomination"] as const).map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setRequestType(t)}
-                    className={`px-3 py-1.5 rounded border text-xs font-medium capitalize ${requestType === t ? "border-primary bg-primary/5 text-primary" : "border-border text-muted-foreground"}`}
-                  >
-                    By {t}
-                  </button>
-                ))}
+            <div className="space-y-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-medium">Request Configuration</h2>
+                <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20">
+                  <Package className="w-3 h-3" />
+                  DENOMINATION MODE
+                </div>
               </div>
+              
               <div className="grid grid-cols-2 gap-4">
-                {requestType === "amount" && (
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1">
-                      Required Amount (USD)
-                    </label>
-                    <input
-                      type="text"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      className="w-full px-3 py-1.5 border rounded text-sm bg-background"
-                    />
-                  </div>
-                )}
-                {requestType === "denomination" && (
-                  <div>
-                    <label className="block text-xs text-muted-foreground mb-1">
-                      Denomination (e.g. USD 100)
-                    </label>
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
+                    Denomination Requirement
+                  </label>
+                  <div className="relative">
                     <input
                       type="text"
                       value={denomReq}
                       onChange={(e) => setDenomReq(e.target.value)}
-                      className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+                      placeholder="e.g. KHR 100000"
+                      className="w-full pl-3 pr-10 py-2 border rounded-md text-sm bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
                     />
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50">
+                      <Clock className="w-4 h-4" />
+                    </div>
                   </div>
-                )}
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
+                </div>
+                
+                <div className="col-span-2 sm:col-span-1">
+                  <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
                     Number of Packages
                   </label>
                   <input
@@ -282,23 +273,29 @@ const StockOutPage: React.FC = () => {
                     placeholder="0"
                     value={pkgCount === "0" || pkgCount === "" ? "" : pkgCount}
                     onChange={(e) => setPkgCount(e.target.value)}
-                    className="w-full px-3 py-1.5 border rounded text-sm bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
                   />
                 </div>
-                <div>
-                  <label className="block text-xs text-muted-foreground mb-1">
-                    Reason
+
+                <div className="col-span-2">
+                  <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
+                    Request Rationale
                   </label>
-                  <input
-                    type="text"
-                    defaultValue="Scheduled disbursement to Provincial Branch"
-                    className="w-full px-3 py-1.5 border rounded text-sm bg-background"
+                  <textarea
+                    defaultValue="Scheduled disbursement to Provincial Branch for atmospheric liquidity maintenance."
+                    rows={2}
+                    className="w-full px-3 py-2 border rounded-md text-sm bg-background resize-none focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
                   />
                 </div>
               </div>
-              <div className="flex justify-end pt-2">
-                <Button size="sm" onClick={() => setStep(1)}>
-                  Find Matching Packages <ArrowRight className="w-3 h-3 ml-1" />
+              
+              <div className="flex justify-end pt-4 border-t">
+                <Button 
+                  size="sm" 
+                  onClick={() => setStep(1)}
+                  className="px-6 h-10 shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                >
+                  Analyze & Select Packages <ArrowRight className="w-4 h-4 ml-2" />
                 </Button>
               </div>
             </div>
