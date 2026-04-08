@@ -36,8 +36,8 @@ const StockInPage: React.FC = () => {
   const mode = 'single';
   const currency = 'KHR';
   const [singleDenom, setSingleDenom] = useSessionState('nawms_si_denom', 100000);
-  const [valuePerSack, setValuePerSack] = useSessionState('nawms_si_valuePerSack', 100000000);
-  const [packageCount, setPackageCount] = useSessionState('nawms_si_packageCount', 40);
+  const [valuePerSack, setValuePerSack] = useSessionState('nawms_si_valuePerSack', 10000000);
+  const [packageCount, setPackageCount] = useSessionState('nawms_si_packageCount', 0);
 
   const [source, setSource] = useSessionState('nawms_si_source', 'Central Treasury');
   const [security, setSecurity] = useSessionState('nawms_si_security', 'high');
@@ -52,22 +52,25 @@ const StockInPage: React.FC = () => {
   const [completedStockIns, setCompletedStockIns] = useSessionState<{ locationId: string, palletId: string, packageCount: number }[]>('nawms_si_completedStockIns', []);
   const initialRetrievalTime = React.useRef(20);
 
-  // --- Sack Value Logic ---
-  // Each sack must contain only one denomination type.
-  // The total sack value is calculated as: denomination × number of notes.
-  // So 200,000 means 2 notes of 100,000, and 300,000 means 3 notes of 100,000.
-  const isValidSackValue = valuePerSack > 0 && valuePerSack % singleDenom === 0;
-  const lastValidNotesRef = React.useRef(1000);
+  const ALLOWED_SACK_VALUES: Record<number, number[]> = {
+    100: [10000, 50000],
+    500: [10000, 50000, 100000],
+    1000: [50000, 100000, 500000],
+    2000: [100000, 200000, 1000000],
+    5000: [100000, 500000, 1000000],
+    10000: [500000, 1000000, 2000000],
+    20000: [1000000, 2000000, 4000000],
+    50000: [1000000, 5000000, 10000000],
+    100000: [5000000, 10000000, 20000000],
+    200000: [10000000, 20000000, 40000000]
+  };
 
-  useEffect(() => {
-    if (isValidSackValue) {
-      lastValidNotesRef.current = valuePerSack / singleDenom;
-    }
-  }, [valuePerSack, singleDenom, isValidSackValue]);
+  const isValidSackValue = (ALLOWED_SACK_VALUES[singleDenom] || []).includes(valuePerSack);
 
   const handleDenomChange = (newDenom: number) => {
     setSingleDenom(newDenom);
-    setValuePerSack(newDenom * lastValidNotesRef.current);
+    const validValues = ALLOWED_SACK_VALUES[newDenom] || [];
+    setValuePerSack(prev => validValues.includes(prev) ? prev : validValues[0] || 0);
   };
 
   const totalValue = useMemo(() => valuePerSack * packageCount, [valuePerSack, packageCount]);
@@ -88,6 +91,14 @@ const StockInPage: React.FC = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filteredDenoms, singleDenom]);
+
+  useEffect(() => {
+    const validValues = ALLOWED_SACK_VALUES[singleDenom] || [];
+    if (!validValues.includes(valuePerSack)) {
+      setValuePerSack(validValues[0] || 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [singleDenom, valuePerSack, setValuePerSack]);
 
   const availablePallets = useMemo(() => {
     let allowedZones: string[] = [];
@@ -457,22 +468,14 @@ const StockInPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1">Value per Sack ({currency})</label>
-                    <input
-                      type="number"
-                      step={singleDenom}
-                      min={singleDenom}
-                      value={valuePerSack}
-                      onChange={e => setValuePerSack(Number(e.target.value))}
-                      onBlur={() => {
-                        let corrected = valuePerSack;
-                        if (corrected < singleDenom) corrected = singleDenom;
-                        else if (corrected % singleDenom !== 0) {
-                          corrected = Math.max(singleDenom, Math.round(corrected / singleDenom) * singleDenom);
-                        }
-                        setValuePerSack(corrected);
-                      }}
-                      className="w-full h-9 px-3 border rounded text-sm bg-background font-mono"
-                    />
+                    <Select value={String(valuePerSack)} onValueChange={(v) => setValuePerSack(Number(v))}>
+                      <SelectTrigger className="h-9 text-sm bg-background font-mono"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(ALLOWED_SACK_VALUES[singleDenom] || []).map(val => (
+                          <SelectItem key={val} value={String(val)}>{val.toLocaleString()}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1">Number of Sacks (Max 40)</label>
@@ -480,12 +483,13 @@ const StockInPage: React.FC = () => {
                       type="number"
                       min="1"
                       max="40"
-                      value={packageCount}
+                      placeholder="0"
+                      value={packageCount === 0 ? '' : packageCount}
                       onChange={e => {
-                        const val = Number(e.target.value);
+                        const val = e.target.value === '' ? 0 : Number(e.target.value);
                         if (val <= 40) setPackageCount(val);
                       }}
-                      className="w-full h-9 px-3 border rounded text-sm bg-background font-mono"
+                      className="w-full h-9 px-3 border rounded text-sm bg-background font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     />
                   </div>
                 </div>
