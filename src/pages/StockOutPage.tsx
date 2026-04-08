@@ -172,12 +172,7 @@ const StockOutPage: React.FC = () => {
     }
   }, [setValuePerSack, valuePerSack, valuePerSackOptions]);
 
-  // FIFO selection respecting request type
-  const selectedPkgs = useMemo(() => {
-    if (!isPackageCountValid) {
-      return [];
-    }
-
+  const matchingPkgs = useMemo(() => {
     const stored = mockPackages
       .filter((p) => p.status === "stored")
       .sort(
@@ -195,12 +190,24 @@ const StockOutPage: React.FC = () => {
         (valuePerSack === 0 || p.totalValue === valuePerSack),
     );
 
-    return matching.slice(0, requestedPackageCount);
+    return matching;
+  }, [selectedDenomination, valuePerSack]);
+
+  const availablePackageCount = matchingPkgs.length;
+  const isRequestExceedingAvailability =
+    isPackageCountValid && requestedPackageCount > availablePackageCount;
+
+  // FIFO selection respecting request type
+  const selectedPkgs = useMemo(() => {
+    if (!isPackageCountValid) {
+      return [];
+    }
+
+    return matchingPkgs.slice(0, requestedPackageCount);
   }, [
     isPackageCountValid,
+    matchingPkgs,
     requestedPackageCount,
-    selectedDenomination,
-    valuePerSack,
   ]);
 
   const totalSelectedValue = selectedPkgs.reduce((s, p) => s + p.totalValue, 0);
@@ -462,7 +469,7 @@ const StockOutPage: React.FC = () => {
                 <h2 className="text-sm font-medium">Request Configuration</h2>
                 <div className="flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary text-[10px] font-bold rounded-full border border-primary/20">
                   <Package className="w-3 h-3" />
-                  DENOMINATION MODE
+                  {availablePackageCount} sacks available
                 </div>
               </div>
               
@@ -517,8 +524,12 @@ const StockOutPage: React.FC = () => {
                   <input
                     type="number"
                     min="1"
-                    placeholder="0"
-                    value={pkgCount}
+                    placeholder={
+                      isPackageCountValid
+                        ? "0"
+                        : "Number of packages must be at least 1."
+                    }
+                    value={isPackageCountValid ? pkgCount : ""}
                     onChange={(e) => {
                       const nextValue = e.target.value;
 
@@ -534,11 +545,15 @@ const StockOutPage: React.FC = () => {
                         setPkgCount("0");
                       }
                     }}
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-background [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
+                    className={`w-full px-3 py-2 border rounded-md text-sm bg-background placeholder:text-muted-foreground/70 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm ${
+                      isRequestExceedingAvailability
+                        ? "border-red-300 focus:ring-red-100"
+                        : ""
+                    }`}
                   />
-                  {!isPackageCountValid && (
+                  {isRequestExceedingAvailability && (
                     <p className="mt-1 text-[11px] text-red-500">
-                      Number of packages must be at least 1.
+                      Only {availablePackageCount} sacks are available for this selection.
                     </p>
                   )}
                 </div>
@@ -570,7 +585,7 @@ const StockOutPage: React.FC = () => {
                 <Button 
                   size="sm" 
                   onClick={() => setStep(1)}
-                  disabled={!isPackageCountValid}
+                  disabled={!isPackageCountValid || isRequestExceedingAvailability}
                   className="px-6 h-10 shadow-lg shadow-primary/10 transition-all hover:scale-[1.02] active:scale-[0.98]"
                 >
                   Analyze & Select Packages <ArrowRight className="w-4 h-4 ml-2" />
@@ -604,7 +619,10 @@ const StockOutPage: React.FC = () => {
                     Sack Available
                   </p>
                   <p className="mt-1 text-2xl font-bold text-foreground">
-                    {selectedPkgs.length}
+                    {availablePackageCount}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    matching sacks in warehouse
                   </p>
                 </div>
                 <div className="rounded-md border bg-muted/30 p-3">
@@ -785,12 +803,12 @@ const StockOutPage: React.FC = () => {
               </div>
 
               {missingPackageCount > 0 && (
-                <div className="p-3 bg-amber-50 border border-warning/20 rounded text-xs flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />
                   <span>
-                    FIFO currently found only {selectedPkgs.length} of {requestedPackageCount} requested sacks for{" "}
-                    {selectedDenomination.currency} {valuePerSack.toLocaleString()} per sack.{" "}
-                    {missingPackageCount} more matching sacks are required before dispatch.
+                    Requested sacks exceed available warehouse stock. FIFO found only{" "}
+                    {availablePackageCount} matching sacks for {selectedDenomination.currency}{" "}
+                    {valuePerSack.toLocaleString()} per sack, so {missingPackageCount} requested sacks are not available now.
                   </span>
                 </div>
               )}
