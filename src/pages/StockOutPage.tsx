@@ -1,6 +1,12 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -94,6 +100,10 @@ const StockOutPage: React.FC = () => {
     "nawms_so_countdown",
     null,
   );
+  const [previewTripIndex, setPreviewTripIndex] = useState(0);
+  const [previewTripLeg, setPreviewTripLeg] = useState<"outbound" | "return">(
+    "outbound",
+  );
 
   const denominationOptions = useMemo(() => {
     const options = new Map<string, { currency: string; denomination: number }>();
@@ -183,6 +193,75 @@ const StockOutPage: React.FC = () => {
   }, [pkgCount, selectedDenomination, valuePerSack]);
 
   const totalSelectedValue = selectedPkgs.reduce((s, p) => s + p.totalValue, 0);
+  const requestedPackageCount = Number(pkgCount) || 0;
+  const totalRequestValue = valuePerSack * requestedPackageCount;
+  const missingPackageCount = Math.max(0, requestedPackageCount - selectedPkgs.length);
+
+  const selectedPalletGroups = useMemo(() => {
+    const groups = new Map<
+      string,
+      {
+        palletId: string;
+        locationCode: string;
+        packageCount: number;
+        totalValue: number;
+        oldestArrival: string;
+        packages: typeof selectedPkgs;
+      }
+    >();
+
+    selectedPkgs.forEach((pkg) => {
+      const existing = groups.get(pkg.palletId);
+      if (existing) {
+        existing.packageCount += 1;
+        existing.totalValue += pkg.totalValue;
+        existing.packages.push(pkg);
+        if (
+          new Date(pkg.arrivalDate).getTime() <
+          new Date(existing.oldestArrival).getTime()
+        ) {
+          existing.oldestArrival = pkg.arrivalDate;
+        }
+        return;
+      }
+
+      groups.set(pkg.palletId, {
+        palletId: pkg.palletId,
+        locationCode: pkg.locationCode,
+        packageCount: 1,
+        totalValue: pkg.totalValue,
+        oldestArrival: pkg.arrivalDate,
+        packages: [pkg],
+      });
+    });
+
+    return Array.from(groups.values()).sort(
+      (a, b) =>
+        new Date(a.oldestArrival).getTime() -
+        new Date(b.oldestArrival).getTime(),
+    );
+  }, [selectedPkgs]);
+
+  const theoreticalMinPallets = Math.ceil(requestedPackageCount / 40);
+  const activePreviewPallet = selectedPalletGroups[previewTripIndex] || null;
+  const previewLiveTask =
+    step === 1 && activePreviewPallet
+      ? {
+          robotId: "ROB-002",
+          sourceLocation:
+            previewTripLeg === "outbound"
+              ? "Inbound Area"
+              : activePreviewPallet.locationCode,
+          targetLocation:
+            previewTripLeg === "outbound"
+              ? activePreviewPallet.locationCode
+              : "Inbound Area",
+          status:
+            previewTripLeg === "outbound"
+              ? ("storing" as const)
+              : ("retrieving" as const),
+        }
+      : null;
 
   const selectedScanTargets = useMemo(() => {
     const targets = new Map<string, string>();
@@ -210,6 +289,31 @@ const StockOutPage: React.FC = () => {
   const allScanned =
     selectedPkgs.length > 0 &&
     selectedPkgs.every((pkg) => scanList.includes(pkg.packageId));
+
+  useEffect(() => {
+    if (step !== 1 || selectedPalletGroups.length === 0) {
+      setPreviewTripIndex(0);
+      setPreviewTripLeg("outbound");
+      return;
+    }
+
+    if (previewTripIndex >= selectedPalletGroups.length) {
+      setPreviewTripIndex(0);
+      setPreviewTripLeg("outbound");
+    }
+  }, [previewTripIndex, selectedPalletGroups.length, step]);
+
+  const handlePreviewTripArrival = useCallback(() => {
+    if (selectedPalletGroups.length === 0) return;
+
+    if (previewTripLeg === "outbound") {
+      setPreviewTripLeg("return");
+      return;
+    }
+
+    setPreviewTripIndex((current) => (current + 1) % selectedPalletGroups.length);
+    setPreviewTripLeg("outbound");
+  }, [previewTripLeg, selectedPalletGroups.length]);
 
   const handleLiveTaskArrival = useCallback(() => {
     if (retrievalPhase === "moving_to_shelf") {
@@ -441,6 +545,17 @@ const StockOutPage: React.FC = () => {
                   />
                 </div>
               </div>
+
+              <div className="pt-2">
+                <div className="p-4 bg-navy-50 rounded border border-navy-100 text-center">
+                  <p className="text-[10px] font-bold uppercase text-primary mb-1">
+                    Total Stock Out Value
+                  </p>
+                  <p className="text-xl font-bold text-primary">
+                    {selectedDenomination.currency} {totalRequestValue.toLocaleString()}
+                  </p>
+                </div>
+              </div>
               
               <div className="flex justify-end pt-4 border-t">
                 <Button 
@@ -465,83 +580,261 @@ const StockOutPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="rounded-md border overflow-hidden">
-                <table className="w-full text-xs">
-                  <thead className="bg-muted">
-                    <tr className="border-b">
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium">
-                        Package ID
-                      </th>
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium">
-                        Location
-                      </th>
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium">
-                        Pallet
-                      </th>
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium">
-                        Arrival
-                      </th>
-                      <th className="text-left py-2 px-3 text-muted-foreground font-medium">
-                        Denominations
-                      </th>
-                      <th className="text-right py-2 px-3 text-muted-foreground font-medium">
-                        Value
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedPkgs.map((pkg) => (
-                      <tr
-                        key={pkg.packageId}
-                        className="border-b hover:bg-muted/30"
-                      >
-                        <td className="py-2 px-3 font-mono font-medium">
-                          {pkg.packageId}
-                        </td>
-                        <td className="py-2 px-3">{pkg.locationCode}</td>
-                        <td className="py-2 px-3 text-muted-foreground">
-                          {pkg.palletId}
-                        </td>
-                        <td className="py-2 px-3">
-                          {new Date(pkg.arrivalDate).toLocaleDateString()}
-                        </td>
-                        <td className="py-2 px-3">
-                          {pkg.denominations.map((d, i) => (
-                            <span
-                              key={i}
-                              className="inline-block mr-1 px-1.5 py-0.5 bg-background border rounded text-[10px]"
-                            >
-                              {d.currency} {d.denomination} x{d.quantity}
-                            </span>
-                          ))}
-                        </td>
-                        <td className="py-2 px-3 text-right font-medium">
-                          {pkg.currency} {pkg.totalValue.toLocaleString()}
-                        </td>
-                      </tr>
-                    ))}
-                    {selectedPkgs.length === 0 && (
-                      <tr>
-                        <td
-                          colSpan={6}
-                          className="py-8 text-center text-muted-foreground"
-                        >
-                          No matching packages found for criteria.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
+              <div className="grid grid-cols-4 gap-3">
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Requested Sacks
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">
+                    {requestedPackageCount}
+                  </p>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Sack Available
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-foreground">
+                    {selectedPkgs.length}
+                  </p>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Pallets Involved
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-primary">
+                    {selectedPalletGroups.length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    Minimum physical retrieval: {theoreticalMinPallets}
+                  </p>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
+                    Robot Cycles
+                  </p>
+                  <p className="mt-1 text-2xl font-bold text-primary">
+                    {selectedPalletGroups.length}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">
+                    {selectedPalletGroups.length * 2} one-way trips
+                  </p>
+                </div>
               </div>
 
-              <div className="p-3 bg-navy-50 border border-navy-100 rounded flex justify-between items-center text-primary">
-                <span className="text-sm font-medium">
-                  Total Selected Value
-                </span>
-                <span className="text-lg font-bold">
-                  USD {totalSelectedValue.toLocaleString()}
-                </span>
+              <div>
+                <div className="rounded-md border bg-card">
+                  <div className="border-b px-4 py-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Retrieval Plan by Pallet
+                    </h3>
+                  </div>
+                  <div className="space-y-2 p-3">
+                    {selectedPalletGroups.map((group, index) => {
+                      const isActive = activePreviewPallet?.palletId === group.palletId;
+                      return (
+                        <div
+                          key={group.palletId}
+                          className={`rounded-md border px-3 py-2 transition-colors ${
+                            isActive
+                              ? "border-primary/30 bg-primary/5"
+                              : "border-border bg-background"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-bold text-foreground">
+                                Trip {index + 1}: {group.palletId}
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {group.locationCode}
+                                {" -> "}
+                                Inbound Area
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-xs font-bold text-primary">
+                                {group.packageCount} sacks
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                {selectedDenomination.currency}{" "}
+                                {group.totalValue.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {selectedPalletGroups.length === 0 && (
+                      <div className="rounded-md border border-dashed px-3 py-6 text-center text-xs text-muted-foreground">
+                        No pallets selected for the requested denomination/value.
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
+
+              <div className="rounded-md border bg-card overflow-hidden">
+                <div className="border-b bg-muted/40 px-4 py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                        Selected Sack List
+                      </h3>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Expand each pallet to inspect the FIFO-selected sacks inside it.
+                      </p>
+                    </div>
+                    <div className="rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-primary">
+                      {selectedPkgs.length} sacks
+                    </div>
+                  </div>
+                </div>
+
+                {selectedPalletGroups.length > 0 ? (
+                  <Accordion type="multiple" className="w-full">
+                    {selectedPalletGroups.map((group, index) => (
+                      <AccordionItem
+                        key={group.palletId}
+                        value={group.palletId}
+                        className="border-b last:border-b-0"
+                      >
+                        <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                          <div className="flex flex-1 items-center justify-between gap-4 text-left">
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Trip {index + 1}: {group.palletId}
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {group.locationCode} •{" "}
+                                {new Date(group.oldestArrival).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <div className="pr-3 text-right">
+                              <p className="text-sm font-semibold text-primary">
+                                {group.packageCount} sacks
+                              </p>
+                              <p className="mt-1 text-xs text-muted-foreground">
+                                {selectedDenomination.currency}{" "}
+                                {group.totalValue.toLocaleString()}
+                              </p>
+                            </div>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="px-4 pb-4">
+                          <div className="rounded-md border overflow-hidden">
+                            <table className="w-full text-xs">
+                              <thead className="bg-muted/60">
+                                <tr className="border-b">
+                                  <th className="text-left py-2 px-3 text-muted-foreground font-medium">
+                                    Package ID
+                                  </th>
+                                  <th className="text-left py-2 px-3 text-muted-foreground font-medium">
+                                    Arrival
+                                  </th>
+                                  <th className="text-left py-2 px-3 text-muted-foreground font-medium">
+                                    Denomination
+                                  </th>
+                                  <th className="text-right py-2 px-3 text-muted-foreground font-medium">
+                                    Value
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {group.packages.map((pkg) => (
+                                  <tr
+                                    key={pkg.packageId}
+                                    className="border-b last:border-b-0 hover:bg-muted/20"
+                                  >
+                                    <td className="py-2 px-3 font-mono font-medium">
+                                      {pkg.packageId}
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      {new Date(pkg.arrivalDate).toLocaleDateString()}
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      {pkg.denominations.map((d, itemIndex) => (
+                                        <span
+                                          key={itemIndex}
+                                          className="inline-block mr-1 px-1.5 py-0.5 bg-background border rounded text-[10px]"
+                                        >
+                                          {d.currency} {d.denomination} x{d.quantity}
+                                        </span>
+                                      ))}
+                                    </td>
+                                    <td className="py-2 px-3 text-right font-medium">
+                                      {pkg.currency} {pkg.totalValue.toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                ) : (
+                  <div className="px-4 py-8 text-center text-xs text-muted-foreground">
+                    No matching packages found for the current request criteria.
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-navy-50 border border-navy-100 rounded text-primary space-y-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary/80">
+                      Available Under FIFO
+                    </p>
+                    <p className="mt-1 text-xs text-primary/70">
+                      Stock that can be dispatched now using the oldest matching sacks first
+                    </p>
+                  </div>
+                  <span className="text-3xl font-bold leading-none">
+                    {selectedPkgs.length} sacks = {selectedDenomination.currency}{" "}
+                    {totalSelectedValue.toLocaleString()}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-md border border-primary/15 bg-white/60 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
+                      Operator Request
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      Need {requestedPackageCount} sacks x {selectedDenomination.currency}{" "}
+                      {valuePerSack.toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Requested outbound quantity and per-sack value
+                    </p>
+                  </div>
+
+                  <div className="rounded-md border border-primary/15 bg-white/60 px-3 py-2">
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary/70">
+                      Available Now
+                    </p>
+                    <p className="mt-1 text-sm font-semibold text-foreground">
+                      {selectedPkgs.length} sacks = {selectedDenomination.currency}{" "}
+                      {totalSelectedValue.toLocaleString()}
+                    </p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">
+                      Matching sacks currently available in storage under FIFO rules
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {missingPackageCount > 0 && (
+                <div className="p-3 bg-amber-50 border border-warning/20 rounded text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-warning flex-shrink-0" />
+                  <span>
+                    FIFO currently found only {selectedPkgs.length} of {requestedPackageCount} requested sacks for{" "}
+                    {selectedDenomination.currency} {valuePerSack.toLocaleString()} per sack.{" "}
+                    {missingPackageCount} more matching sacks are required before dispatch.
+                  </span>
+                </div>
+              )}
 
               {/* Estimated robot route */}
               <div className="p-3 bg-blue-50/50 border border-blue-100/50 rounded text-xs text-blue-700 flex items-start gap-3">
@@ -551,16 +844,16 @@ const StockOutPage: React.FC = () => {
                     Estimated Robot Retrieval Route
                   </p>
                   <p className="mt-1 font-medium">
-                    {selectedPkgs
-                      .map((p) => p.locationCode)
-                      .filter((v, i, a) => a.indexOf(v) === i)
+                    {selectedPalletGroups
+                      .map((group) => group.locationCode)
                       .join(" → ")}{" "}
-                    → Outbound Door
+                    → Inbound Area
                   </p>
                   <p className="opacity-70 mt-0.5">
                     Estimated retrieval time: ~
-                    {Math.max(5, selectedPkgs.length * 2)} minutes for{" "}
-                    {selectedPkgs.length} packages
+                    {Math.max(5, selectedPalletGroups.length * 4)} minutes for{" "}
+                    {selectedPalletGroups.length} pallet cycles and{" "}
+                    {selectedPkgs.length} sacks
                   </p>
                 </div>
               </div>
