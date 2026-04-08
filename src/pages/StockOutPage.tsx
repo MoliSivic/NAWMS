@@ -1,5 +1,16 @@
 import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  DEFAULT_CURRENCY,
+  getAllowedSackValues,
+} from "@/data/denominationRules";
 import { mockPackages, mockPallets } from "@/data/mockData";
 import { warehouseLayout } from "@/data/warehouseLayout";
 import WarehouseCanvas, { LiveTask } from "@/components/WarehouseCanvas";
@@ -33,12 +44,20 @@ function useSessionState<T>(key: string, initialValue: T) {
 }
 
 const steps = [
-  "Request Details",
+  "Details",
   "System Selection (FIFO)",
   "Confirm & Dispatch",
   "Robot Retrieval",
   "Outbound Verification",
 ];
+
+function parseDenominationRequest(value: string) {
+  const parts = value.trim().split(/\s+/);
+  return {
+    currency: parts[0]?.toUpperCase() || DEFAULT_CURRENCY,
+    denomination: Number(parts[1]) || 0,
+  };
+}
 
 const StockOutPage: React.FC = () => {
   const [step, setStep] = useSessionState("nawms_so_step", 0);
@@ -47,7 +66,11 @@ const StockOutPage: React.FC = () => {
   >("nawms_so_reqType", "denomination");
   const [denomReq, setDenomReq] = useSessionState(
     "nawms_so_denomReq",
-    "KHR 100000",
+    `${DEFAULT_CURRENCY} 100000`,
+  );
+  const [valuePerSack, setValuePerSack] = useSessionState(
+    "nawms_so_valuePerSack",
+    5000000,
   );
   const [pkgCount, setPkgCount] = useSessionState("nawms_so_pkgCount", "0");
   const [submitted, setSubmitted] = useSessionState(
@@ -72,6 +95,71 @@ const StockOutPage: React.FC = () => {
     null,
   );
 
+  const denominationOptions = useMemo(() => {
+    const options = new Map<string, { currency: string; denomination: number }>();
+
+    mockPackages
+      .filter((pkg) => pkg.status === "stored")
+      .forEach((pkg) => {
+        pkg.denominations.forEach((line) => {
+          const key = `${line.currency} ${line.denomination}`;
+          if (!options.has(key)) {
+            options.set(key, {
+              currency: line.currency,
+              denomination: line.denomination,
+            });
+          }
+        });
+      });
+
+    return Array.from(options.values()).sort((a, b) => {
+      if (a.currency !== b.currency) {
+        return a.currency.localeCompare(b.currency);
+      }
+      return a.denomination - b.denomination;
+    });
+  }, []);
+
+  const selectedDenomination = useMemo(
+    () => parseDenominationRequest(denomReq),
+    [denomReq],
+  );
+
+  const valuePerSackOptions = useMemo(() => {
+    const matchingValues = new Set<number>();
+
+    mockPackages
+      .filter((pkg) => pkg.status === "stored")
+      .forEach((pkg) => {
+        const matchesDenomination =
+          pkg.currency === selectedDenomination.currency &&
+          pkg.denominations.some(
+            (line) => line.denomination === selectedDenomination.denomination,
+          );
+
+        if (matchesDenomination) {
+          matchingValues.add(pkg.totalValue);
+        }
+      });
+
+    return getAllowedSackValues(selectedDenomination.denomination).filter(
+      (value) => matchingValues.has(value),
+    );
+  }, [selectedDenomination]);
+
+  useEffect(() => {
+    if (valuePerSackOptions.length === 0) {
+      if (valuePerSack !== 0) {
+        setValuePerSack(0);
+      }
+      return;
+    }
+
+    if (!valuePerSackOptions.includes(valuePerSack)) {
+      setValuePerSack(valuePerSackOptions[0]);
+    }
+  }, [setValuePerSack, valuePerSack, valuePerSackOptions]);
+
   // FIFO selection respecting request type
   const selectedPkgs = useMemo(() => {
     const stored = mockPackages
@@ -81,30 +169,47 @@ const StockOutPage: React.FC = () => {
           new Date(a.arrivalDate).getTime() - new Date(b.arrivalDate).getTime(),
       );
 
-    const parts = denomReq.trim().split(/\s+/);
-    const cur = parts[0]?.toUpperCase() || "KHR";
-    const denomVal = Number(parts[1]) || 0;
-    
     const matching = stored.filter(
       (p) =>
-        p.currency === cur &&
-        (denomVal === 0 ||
-          p.denominations.some((d) => d.denomination === denomVal)),
+        p.currency === selectedDenomination.currency &&
+        (selectedDenomination.denomination === 0 ||
+          p.denominations.some(
+            (d) => d.denomination === selectedDenomination.denomination,
+          )) &&
+        (valuePerSack === 0 || p.totalValue === valuePerSack),
     );
-    
+
     return matching.slice(0, Number(pkgCount) || 5);
-  }, [denomReq, pkgCount]);
+  }, [pkgCount, selectedDenomination, valuePerSack]);
 
   const totalSelectedValue = selectedPkgs.reduce((s, p) => s + p.totalValue, 0);
 
+  const selectedScanTargets = useMemo(() => {
+    const targets = new Map<string, string>();
+
+    selectedPkgs.forEach((pkg) => {
+      targets.set(pkg.packageId.toUpperCase(), pkg.packageId);
+      targets.set(pkg.qrCode.toUpperCase(), pkg.packageId);
+    });
+
+    return targets;
+  }, [selectedPkgs]);
+
   const handleScan = () => {
-    if (scanInput.trim() && !scanList.includes(scanInput)) {
-      setScanList((l) => [...l, scanInput]);
-      setScanInput("");
+    const rawValue = scanInput.trim();
+    if (!rawValue) return;
+
+    const matchedPackageId = selectedScanTargets.get(rawValue.toUpperCase());
+    if (matchedPackageId && !scanList.includes(matchedPackageId)) {
+      setScanList((list) => [...list, matchedPackageId]);
     }
+
+    setScanInput("");
   };
 
-  const allScanned = scanList.length === selectedPkgs.length;
+  const allScanned =
+    selectedPkgs.length > 0 &&
+    selectedPkgs.every((pkg) => scanList.includes(pkg.packageId));
 
   const handleLiveTaskArrival = useCallback(() => {
     if (retrievalPhase === "moving_to_shelf") {
@@ -147,48 +252,65 @@ const StockOutPage: React.FC = () => {
   }, [robotStatus, retrievalPhase, selectedPkgs]);
 
   const confirmRelease = () => {
-    setVerified(true);
+    if (!allScanned) return;
 
-    // Cleanup warehouse layout & data globally across the system
+    setVerified(true);
+    const releasedAt = new Date().toISOString();
+    const releasedPackageIds = new Set(selectedPkgs.map((pkg) => pkg.packageId));
+    const touchedPalletIds = new Set(selectedPkgs.map((pkg) => pkg.palletId));
+
     selectedPkgs.forEach((pkg) => {
       const originalPkg = mockPackages.find(
         (p) => p.packageId === pkg.packageId,
       );
+
       if (originalPkg) {
         originalPkg.status = "released";
-        originalPkg.releasedDate = new Date().toISOString();
+        originalPkg.releasedDate = releasedAt;
+        originalPkg.palletId = "";
+        originalPkg.locationCode = "Released";
+      }
+    });
+
+    touchedPalletIds.forEach((palletId) => {
+      const pallet = mockPallets.find((item) => item.palletId === palletId);
+      if (!pallet) return;
+
+      const currentLocation = pallet.locationCode;
+      pallet.packages = pallet.packages.filter(
+        (packageId) => !releasedPackageIds.has(packageId),
+      );
+      pallet.currentPackageCount = pallet.packages.length;
+
+      const slot = warehouseLayout.shelves
+        .flatMap((shelf) => shelf.slots)
+        .find((item) => item.locationId === currentLocation);
+
+      if (pallet.currentPackageCount === 0) {
+        pallet.status = "available";
+        if (slot && slot.palletId === pallet.palletId) {
+          slot.palletId = null;
+          slot.occupancy = 0;
+        }
+        pallet.locationCode = "";
+        return;
       }
 
-      const pallet = mockPallets.find((p) => p.palletId === pkg.palletId);
-      if (pallet) {
-        pallet.currentPackageCount = Math.max(
-          0,
-          pallet.currentPackageCount - 1,
-        );
-        if (pallet.currentPackageCount === 0) {
-          pallet.status = "available";
-
-          for (const shelf of warehouseLayout.shelves) {
-            const slot = shelf.slots.find(
-              (s) => s.locationId === pallet.locationCode,
-            );
-            if (slot && slot.palletId === pallet.palletId) {
-              slot.palletId = null;
-              slot.occupancy = 0;
-            }
-          }
-          pallet.locationCode = "";
-        }
+      pallet.status = "in-use";
+      if (slot && slot.palletId === pallet.palletId) {
+        slot.occupancy = pallet.currentPackageCount / pallet.maxCapacity;
       }
     });
   };
 
   const clearSession = () => {
     setStep(0);
-    setDenomReq("KHR 100000");
+    setDenomReq(`${DEFAULT_CURRENCY} 100000`);
+    setValuePerSack(0);
     setPkgCount("0");
     setSubmitted(false);
     setScanList([]);
+    setScanInput("");
     setVerified(false);
     setRobotStatus("idle");
     setRetrievalPhase("idle");
@@ -250,26 +372,51 @@ const StockOutPage: React.FC = () => {
                 </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2 sm:col-span-1">
+              <div className="grid grid-cols-3 gap-4">
+                <div>
                   <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
                     Denomination Requirement
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={denomReq}
-                      onChange={(e) => setDenomReq(e.target.value)}
-                      placeholder="e.g. KHR 100000"
-                      className="w-full pl-3 pr-10 py-2 border rounded-md text-sm bg-background focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-sm"
-                    />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground/50">
-                      <Clock className="w-4 h-4" />
-                    </div>
-                  </div>
+                  <Select value={denomReq} onValueChange={setDenomReq}>
+                    <SelectTrigger className="h-10 text-sm bg-background shadow-sm">
+                      <SelectValue placeholder="Select currency and denomination" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {denominationOptions.map((option) => {
+                        const value = `${option.currency} ${option.denomination}`;
+                        return (
+                          <SelectItem key={value} value={value}>
+                            {option.currency} {option.denomination.toLocaleString()}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
                 </div>
-                
-                <div className="col-span-2 sm:col-span-1">
+
+                <div>
+                  <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
+                    Total Value per Sack
+                  </label>
+                  <Select
+                    value={String(valuePerSack)}
+                    onValueChange={(value) => setValuePerSack(Number(value))}
+                    disabled={valuePerSackOptions.length === 0}
+                  >
+                    <SelectTrigger className="h-10 text-sm bg-background shadow-sm">
+                      <SelectValue placeholder="Select total value per sack" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {valuePerSackOptions.map((value) => (
+                        <SelectItem key={value} value={String(value)}>
+                          {selectedDenomination.currency} {value.toLocaleString()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
                   <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
                     Number of Packages
                   </label>
@@ -283,7 +430,7 @@ const StockOutPage: React.FC = () => {
                   />
                 </div>
 
-                <div className="col-span-2">
+                <div className="col-span-3">
                   <label className="block text-xs text-muted-foreground mb-1.5 font-medium">
                     Request Rationale
                   </label>
@@ -597,8 +744,7 @@ const StockOutPage: React.FC = () => {
                 <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
                   {selectedPkgs.map((pkg) => {
                     const scanned =
-                      scanList.includes(pkg.packageId) ||
-                      scanList.includes(`NBC-${pkg.packageId}`);
+                      scanList.includes(pkg.packageId);
                     return (
                       <div
                         key={pkg.packageId}

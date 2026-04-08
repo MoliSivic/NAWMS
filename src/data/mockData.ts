@@ -1,4 +1,10 @@
 import type { User, MoneyPackage, DenominationLine, Pallet, Zone, ShelfLocation, Robot, RobotTask, Approval, AuditLog, OptimizationSuggestion, Alert, StockMovement } from './types';
+import {
+  DEFAULT_CURRENCY,
+  NOTES_PER_SACK_OPTIONS,
+  buildPackageQrCode,
+  getDenominationsForZoneLetter,
+} from './denominationRules';
 
 // ─── Users ───
 export const mockUsers: User[] = [
@@ -24,7 +30,7 @@ function denom(currency: string, denomination: number, quantity: number): Denomi
 // ─── Money Packages (654 packages) ───
 const pkgBase = (id: number, denoms: DenominationLine[], palletId: string, loc: string, status: MoneyPackage['status'], security: MoneyPackage['securityLevel'], date: string): MoneyPackage => ({
   packageId: `PKG-${String(id).padStart(5, '0')}`,
-  qrCode: `QR-${String(id).padStart(5, '0')}-NBC`,
+  qrCode: buildPackageQrCode(id),
   productType: 'Money',
   denominations: denoms,
   totalValue: denoms.reduce((s, d) => s + d.subtotal, 0),
@@ -69,22 +75,12 @@ const tierCoverageConfigs = [
 function getPalletSackConfig(palletId: string, locationCode: string): DenominationLine[] {
   const zoneLetter = locationCode.split('-')[0];
   const seed = Array.from(palletId).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  
-  let denomValue = 100000;
-  if (zoneLetter === 'A') {
-    denomValue = [200000, 100000, 50000][seed % 3];
-  } else if (zoneLetter === 'B') {
-    denomValue = [20000, 10000, 5000][seed % 3];
-  } else if (zoneLetter === 'C') {
-    denomValue = [2000, 1000, 500][seed % 3];
-  } else if (zoneLetter === 'D') {
-    denomValue = [200, 100][seed % 2];
-  }
-  
-  const quantityMultipliers = [10, 25, 50, 100];
-  const quantity = quantityMultipliers[seed % 4];
-  
-  return [denom('KHR', denomValue, quantity)];
+
+  const denominationOptions = getDenominationsForZoneLetter(zoneLetter);
+  const denomValue = denominationOptions[seed % denominationOptions.length] || 100000;
+  const quantity = NOTES_PER_SACK_OPTIONS[seed % NOTES_PER_SACK_OPTIONS.length];
+
+  return [denom(DEFAULT_CURRENCY, denomValue, quantity)];
 }
 
 let nextTierCoveragePackageId = 339;

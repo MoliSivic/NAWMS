@@ -2,6 +2,13 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+  DEFAULT_CURRENCY,
+  buildPackageQrCode,
+  getAllowedSackValues,
+  getDenominationsForSecurity,
+  getSecurityForDenomination,
+} from '@/data/denominationRules';
 import { mockPallets, mockShelfLocations, mockZones, mockPackages } from '@/data/mockData';
 import { warehouseLayout } from '@/data/warehouseLayout';
 import { CheckCircle, Printer, QrCode, ArrowRight, MapPin, ShieldCheck, Box, Loader2, ScanLine, Check, XCircle } from 'lucide-react';
@@ -35,7 +42,7 @@ const StockInPage: React.FC = () => {
   const navigate = useNavigate();
   const [step, setStep] = useSessionState('nawms_si_step', 0);
   const mode = 'single';
-  const currency = 'KHR';
+  const currency = DEFAULT_CURRENCY;
   const [singleDenom, setSingleDenom] = useSessionState('nawms_si_denom', 100000);
   const [valuePerSack, setValuePerSack] = useSessionState('nawms_si_valuePerSack', 10000000);
   const [packageCount, setPackageCount] = useSessionState('nawms_si_packageCount', 0);
@@ -53,37 +60,18 @@ const StockInPage: React.FC = () => {
   const [completedStockIns, setCompletedStockIns] = useSessionState<{ locationId: string, palletId: string, packageCount: number }[]>('nawms_si_completedStockIns', []);
   const initialRetrievalTime = React.useRef(20);
 
-  const ALLOWED_SACK_VALUES: Record<number, number[]> = {
-    100: [10000, 50000],
-    500: [10000, 50000, 100000],
-    1000: [50000, 100000, 500000],
-    2000: [100000, 200000, 1000000],
-    5000: [100000, 500000, 1000000],
-    10000: [500000, 1000000, 2000000],
-    20000: [1000000, 2000000, 4000000],
-    50000: [1000000, 5000000, 10000000],
-    100000: [5000000, 10000000, 20000000],
-    200000: [10000000, 20000000, 40000000]
-  };
-
-  const isValidSackValue = (ALLOWED_SACK_VALUES[singleDenom] || []).includes(valuePerSack);
+  const isValidSackValue = getAllowedSackValues(singleDenom).includes(valuePerSack);
 
   const handleDenomChange = (newDenom: number) => {
     setSingleDenom(newDenom);
-    const validValues = ALLOWED_SACK_VALUES[newDenom] || [];
+    const validValues = getAllowedSackValues(newDenom);
     setValuePerSack(prev => validValues.includes(prev) ? prev : validValues[0] || 0);
   };
 
   const totalValue = useMemo(() => valuePerSack * packageCount, [valuePerSack, packageCount]);
 
   const filteredDenoms = useMemo(() => {
-    switch (security) {
-      case 'high': return [200000, 100000, 50000];
-      case 'medium': return [20000, 10000, 5000];
-      case 'low': return [2000, 1000, 500];
-      case 'mixed': return [200, 100];
-      default: return [200000, 100000, 50000, 20000, 10000, 5000, 2000, 1000, 500, 200, 100];
-    }
+    return getDenominationsForSecurity(security);
   }, [security]);
 
   useEffect(() => {
@@ -94,7 +82,7 @@ const StockInPage: React.FC = () => {
   }, [filteredDenoms, singleDenom]);
 
   useEffect(() => {
-    const validValues = ALLOWED_SACK_VALUES[singleDenom] || [];
+    const validValues = getAllowedSackValues(singleDenom);
     if (!validValues.includes(valuePerSack)) {
       setValuePerSack(validValues[0] || 0);
     }
@@ -102,16 +90,12 @@ const StockInPage: React.FC = () => {
   }, [singleDenom, valuePerSack, setValuePerSack]);
 
   const availablePallets = useMemo(() => {
-    let allowedZones: string[] = [];
-    if ([50000, 100000, 200000].includes(singleDenom)) {
-      allowedZones = ['ZONE-A'];
-    } else if ([5000, 10000, 20000].includes(singleDenom)) {
-      allowedZones = ['ZONE-B'];
-    } else if ([500, 1000, 2000].includes(singleDenom)) {
-      allowedZones = ['ZONE-C'];
-    } else if ([100, 200].includes(singleDenom)) {
-      allowedZones = ['ZONE-D'];
-    }
+    const selectedSecurity = getSecurityForDenomination(singleDenom);
+    const allowedZones = selectedSecurity
+      ? mockZones
+          .filter((zone) => zone.securityClass === selectedSecurity)
+          .map((zone) => zone.zoneId)
+      : [];
 
     return mockPallets.filter(p => {
       const zoneMatch = allowedZones.includes(p.zoneId);
@@ -211,7 +195,7 @@ const StockInPage: React.FC = () => {
 
             mockPackages.push({
               packageId: pkgId,
-              qrCode: `NBC-${pkgId}`,
+              qrCode: buildPackageQrCode(nextId),
               productType: 'Banknotes',
               denominations: [{
                 currency: currency,
@@ -472,7 +456,7 @@ const StockInPage: React.FC = () => {
                     <Select value={String(valuePerSack)} onValueChange={(v) => setValuePerSack(Number(v))}>
                       <SelectTrigger className="h-9 text-sm bg-background font-mono"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {(ALLOWED_SACK_VALUES[singleDenom] || []).map(val => (
+                        {getAllowedSackValues(singleDenom).map(val => (
                           <SelectItem key={val} value={String(val)}>{val.toLocaleString()}</SelectItem>
                         ))}
                       </SelectContent>
