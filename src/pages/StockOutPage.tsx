@@ -738,7 +738,7 @@ const StockOutPage: React.FC = () => {
                       Stock that can be dispatched now using the oldest matching sacks first
                     </p>
                   </div>
-                  <span className="text-3xl font-bold leading-none">
+                  <span className="text-2xl font-bold leading-none">
                     {selectedPkgs.length} sacks = {selectedDenomination.currency}{" "}
                     {totalSelectedValue.toLocaleString()}
                   </span>
