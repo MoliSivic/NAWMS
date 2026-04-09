@@ -7,7 +7,6 @@ import {
   buildPackageQrCode,
   getAllowedSackValues,
   getDenominationsForSecurity,
-  getSecurityForDenomination,
 } from '@/data/denominationRules';
 import { mockPallets, mockShelfLocations, mockZones, mockPackages } from '@/data/mockData';
 import { warehouseLayout } from '@/data/warehouseLayout';
@@ -16,7 +15,22 @@ import { toast } from "@/hooks/use-toast";
 import WarehouseCanvas, { LiveTask } from '@/components/WarehouseCanvas';
 import qrCodeImg from '@/assets/qr-code.png';
 
-interface DenomRow { currency: string; denomination: number; quantity: number; }
+interface PalletAssignmentEvaluation {
+  pallet: typeof mockPallets[number];
+  zoneName: string;
+  currentSacks: number;
+  remainingCapacity: number;
+  zoneAllowed: boolean;
+  statusAllowed: boolean;
+  capacityAllowed: boolean;
+  compatibilityAllowed: boolean;
+  fifoAllowed: boolean;
+  existingCurrency: string | null;
+  existingDenomination: number | null;
+  existingSackValue: number | null;
+  reasons: string[];
+  allowed: boolean;
+}
 
 const steps = ['Manifest', 'Count', 'Assignment', 'Retrieval', 'Loading', 'Dispatch'];
 
@@ -27,7 +41,9 @@ function useSessionState<T>(key: string, initialValue: T) {
       if (saved !== null) {
         return JSON.parse(saved);
       }
-    } catch { }
+    } catch {
+      return initialValue;
+    }
     return initialValue;
   });
 
@@ -63,6 +79,10 @@ const StockInPage: React.FC = () => {
   const isValidSackValue = getAllowedSackValues(singleDenom).includes(valuePerSack);
   const isPackageCountValid = packageCount > 0;
   const packageCountError = !isPackageCountValid ? 'Enter a sack count greater than 0 to continue.' : '';
+  const targetZone = useMemo(
+    () => mockZones.find((zone) => zone.securityClass === security) ?? null,
+    [security],
+  );
 
   const handleDenomChange = (newDenom: number) => {
     setSingleDenom(newDenom);
@@ -78,40 +98,133 @@ const StockInPage: React.FC = () => {
 
   useEffect(() => {
     if (!filteredDenoms.includes(singleDenom)) {
-      handleDenomChange(filteredDenoms[0]);
+      const nextDenom = filteredDenoms[0];
+      setSingleDenom(nextDenom);
+      const validValues = getAllowedSackValues(nextDenom);
+      setValuePerSack((prev) => (validValues.includes(prev) ? prev : validValues[0] || 0));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filteredDenoms, singleDenom]);
+  }, [filteredDenoms, setSingleDenom, setValuePerSack, singleDenom]);
 
   useEffect(() => {
     const validValues = getAllowedSackValues(singleDenom);
     if (!validValues.includes(valuePerSack)) {
       setValuePerSack(validValues[0] || 0);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [singleDenom, valuePerSack, setValuePerSack]);
 
-  const availablePallets = useMemo(() => {
-    const selectedSecurity = getSecurityForDenomination(singleDenom);
-    const allowedZones = selectedSecurity
-      ? mockZones
-          .filter((zone) => zone.securityClass === selectedSecurity)
-          .map((zone) => zone.zoneId)
-      : [];
+  const palletAssignments = useMemo<PalletAssignmentEvaluation[]>(() => {
+    return [...mockPallets]
+      .sort((a, b) => a.palletId.localeCompare(b.palletId))
+      .map((pallet) => {
+        const existingPackages = mockPackages.filter(
+          (pkg) =>
+            pkg.palletId === pallet.palletId &&
+            pkg.status !== 'released' &&
+            pkg.status !== 'discarded',
+        );
+        const currentSacks = pallet.currentPackageCount;
+        const remainingCapacity = Math.max(0, pallet.maxCapacity - currentSacks);
+        const zoneAllowed = targetZone ? pallet.zoneId === targetZone.zoneId : false;
+        const statusAllowed = pallet.status === 'available' || pallet.status === 'in-use';
+        const capacityAllowed = isPackageCountValid && remainingCapacity >= packageCount;
 
-    return mockPallets.filter(p => {
-      const zoneMatch = allowedZones.includes(p.zoneId);
-      const capacityMatch = p.currentPackageCount === 0; // Look for empty pallets for new assignment
-      return p.status !== 'maintenance' && zoneMatch && capacityMatch;
-    }).sort((a, b) => a.palletId.localeCompare(b.palletId));
-  }, [singleDenom]);
+        const currencySet = new Set(existingPackages.map((pkg) => pkg.currency));
+        const denominationSet = new Set(
+          existingPackages.flatMap((pkg) => pkg.denominations.map((line) => line.denomination)),
+        );
+        const sackValueSet = new Set(existingPackages.map((pkg) => pkg.totalValue));
 
-  const selectedPallet = mockPallets.find(p => p.palletId === palletId);
-  const suggestedPallet = availablePallets[0];
-  const effectivePalletId = palletId || suggestedPallet?.palletId || '';
+        const existingCurrency = currencySet.size === 1 ? [...currencySet][0] : null;
+        const existingDenomination = denominationSet.size === 1 ? [...denominationSet][0] : null;
+        const existingSackValue = sackValueSet.size === 1 ? [...sackValueSet][0] : null;
+        const hasMixedExistingProfile =
+          currencySet.size > 1 || denominationSet.size > 1 || sackValueSet.size > 1;
+        const compatibilityAllowed =
+          existingPackages.length === 0 ||
+          (!hasMixedExistingProfile &&
+            existingCurrency === currency &&
+            existingDenomination === singleDenom &&
+            existingSackValue === valuePerSack);
+        const fifoAllowed =
+          existingPackages.length === 0 ||
+          existingPackages.every((pkg) => pkg.status === 'stored');
+
+        const reasons: string[] = [];
+        if (!zoneAllowed) {
+          reasons.push(`Wrong zone. This stock-in is restricted to ${targetZone?.zoneName ?? 'the selected zone'}.`);
+        }
+        if (!statusAllowed) {
+          reasons.push(
+            pallet.status === 'maintenance'
+              ? 'Pallet is under maintenance and cannot receive stock.'
+              : 'Pallet is in transit and cannot receive stock right now.',
+          );
+        }
+        if (statusAllowed && !capacityAllowed) {
+          reasons.push(
+            `Not enough space. ${remainingCapacity} sack${remainingCapacity === 1 ? '' : 's'} remaining, ${packageCount} required.`,
+          );
+        }
+        if (statusAllowed && existingPackages.length > 0 && !compatibilityAllowed) {
+          reasons.push(
+            hasMixedExistingProfile
+              ? 'Pallet contains mixed sack profiles, so compatibility cannot be guaranteed.'
+              : `Compatibility failed. Existing sacks are ${existingCurrency ?? currency} ${existingDenomination?.toLocaleString() ?? '-'} at ${existingSackValue?.toLocaleString() ?? '-'} per sack.`,
+          );
+        }
+        if (statusAllowed && existingPackages.length > 0 && !fifoAllowed) {
+          reasons.push('FIFO rule failed. Existing sacks are not all in stored status.');
+        }
+
+        return {
+          pallet,
+          zoneName: mockZones.find((zone) => zone.zoneId === pallet.zoneId)?.zoneName || pallet.zoneId,
+          currentSacks,
+          remainingCapacity,
+          zoneAllowed,
+          statusAllowed,
+          capacityAllowed,
+          compatibilityAllowed,
+          fifoAllowed,
+          existingCurrency,
+          existingDenomination,
+          existingSackValue,
+          reasons,
+          allowed:
+            zoneAllowed &&
+            statusAllowed &&
+            capacityAllowed &&
+            compatibilityAllowed &&
+            fifoAllowed,
+        };
+      });
+  }, [currency, isPackageCountValid, packageCount, singleDenom, targetZone, valuePerSack]);
+
+  const selectedAssignment = useMemo(
+    () => palletAssignments.find((assignment) => assignment.pallet.palletId === palletId) ?? null,
+    [palletAssignments, palletId],
+  );
+  const suggestedAssignment = useMemo(
+    () => palletAssignments.find((assignment) => assignment.allowed) ?? null,
+    [palletAssignments],
+  );
+  const dropdownAssignments = useMemo(
+    () =>
+      palletAssignments.filter((assignment) => assignment.allowed),
+    [palletAssignments],
+  );
+  const allowedPalletIds = useMemo(
+    () => new Set(dropdownAssignments.map((assignment) => assignment.pallet.palletId)),
+    [dropdownAssignments],
+  );
+  const effectiveAssignment = selectedAssignment?.allowed ? selectedAssignment : suggestedAssignment;
+  const effectivePalletId = effectiveAssignment?.pallet.palletId || '';
+  const assignmentPanel = selectedAssignment ?? effectiveAssignment;
+  const assignmentWarnings = selectedAssignment && !selectedAssignment.allowed ? selectedAssignment.reasons : [];
+  const hasEligiblePallet = palletAssignments.some((assignment) => assignment.allowed);
 
   const suggestedLocation = useMemo(() => {
-    const pallet = selectedPallet || suggestedPallet;
+    const pallet = effectiveAssignment?.pallet ?? null;
     if (!pallet) return null;
     const loc = mockShelfLocations.find(l => l.palletId === pallet.palletId);
     if (loc) {
@@ -123,7 +236,7 @@ const StockInPage: React.FC = () => {
       };
     }
     return null;
-  }, [selectedPallet, suggestedPallet]);
+  }, [effectiveAssignment]);
 
   const previewPkgId = useMemo(() => {
     const existingPkgIds = new Set(mockPackages.map(p => p.packageId));
@@ -170,18 +283,19 @@ const StockInPage: React.FC = () => {
       t = setTimeout(() => {
         setStoringPhase('returning');
         if (suggestedLocation?.locationId) {
+          const palletObj = mockPallets.find(p => p.palletId === effectivePalletId);
+          const existingPackageCount = palletObj?.currentPackageCount ?? 0;
+          const updatedPackageCount = existingPackageCount + packageCount;
+
           setCompletedStockIns(prev => [...prev, {
             locationId: suggestedLocation.locationId,
             palletId: effectivePalletId,
-            packageCount: packageCount
+            packageCount: updatedPackageCount
           }]);
-
-          const palletObj = mockPallets.find(p => p.palletId === effectivePalletId);
           if (palletObj) {
-            palletObj.currentPackageCount = packageCount;
+            palletObj.currentPackageCount = updatedPackageCount;
             palletObj.locationCode = suggestedLocation.locationId;
             palletObj.status = 'in-use';
-            palletObj.packages = [];
           }
 
           const existingPkgIds = new Set(mockPackages.map(p => p.packageId));
@@ -210,7 +324,7 @@ const StockInPage: React.FC = () => {
               palletId: effectivePalletId,
               locationCode: suggestedLocation.locationId,
               status: 'stored',
-              securityLevel: security as any,
+              securityLevel: security === 'mixed' ? 'medium' : security,
               sealStatus: 'sealed',
               source: source,
               arrivalDate: new Date().toISOString(),
@@ -230,7 +344,7 @@ const StockInPage: React.FC = () => {
             const slot = shelf.slots.find(s => s.locationId === suggestedLocation.locationId);
             if (slot) {
               slot.palletId = effectivePalletId;
-              slot.occupancy = packageCount / 40;
+              slot.occupancy = updatedPackageCount / 40;
               break;
             }
           }
@@ -238,7 +352,7 @@ const StockInPage: React.FC = () => {
       }, 4000);
     }
     return () => clearTimeout(t);
-  }, [storingPhase, suggestedLocation, effectivePalletId, packageCount, setStoringPhase, setCompletedStockIns]);
+  }, [currency, effectivePalletId, packageCount, security, setCompletedStockIns, setStoringPhase, singleDenom, source, storingPhase, suggestedLocation, valuePerSack]);
 
   // Independent Printing Logic
   const handlePrintingDispatch = () => {
@@ -287,29 +401,6 @@ const StockInPage: React.FC = () => {
 
   const handleCancel = () => {
     if (confirm('Discard registration and abort operation? Data will be reverted.')) {
-      const palletObj = mockPallets.find(p => p.palletId === effectivePalletId);
-      if (palletObj && palletObj.status === 'in-use') {
-        palletObj.status = 'available';
-        palletObj.currentPackageCount = 0;
-        palletObj.locationCode = '';
-        palletObj.packages = [];
-      }
-      if (suggestedLocation?.locationId) {
-        for (const shelf of warehouseLayout.shelves) {
-          const slot = shelf.slots.find(s => s.locationId === suggestedLocation.locationId);
-          if (slot && slot.palletId === effectivePalletId) {
-            slot.palletId = null;
-            slot.occupancy = 0;
-            break;
-          }
-        }
-      }
-      for (let i = mockPackages.length - 1; i >= 0; i--) {
-        if (mockPackages[i].palletId === effectivePalletId) {
-          mockPackages.splice(i, 1);
-        }
-      }
-      setCompletedStockIns(prev => prev.filter(c => c.palletId !== effectivePalletId));
       clearSessionAndReload();
     }
   };
@@ -523,14 +614,25 @@ const StockInPage: React.FC = () => {
                 <div className="space-y-4">
                   <div>
                     <label className="block text-xs text-muted-foreground mb-1">Target Pallet ID</label>
-                    <Select value={effectivePalletId} onValueChange={setPalletId}>
+                    <Select
+                      value={
+                        allowedPalletIds.has(effectivePalletId)
+                          ? effectivePalletId
+                          : ''
+                      }
+                      onValueChange={setPalletId}
+                    >
                       <SelectTrigger className="h-9 text-sm bg-background font-mono">
                         <SelectValue placeholder="Select pallet..." />
                       </SelectTrigger>
                       <SelectContent>
-                        {availablePallets.map(p => (
-                          <SelectItem key={p.palletId} value={p.palletId}>
-                            {p.palletId} — (EMPTY)
+                        {dropdownAssignments.map((assignment) => (
+                          <SelectItem
+                            key={assignment.pallet.palletId}
+                            value={assignment.pallet.palletId}
+                            disabled={!assignment.allowed}
+                          >
+                            {assignment.pallet.palletId} — {assignment.pallet.zoneId.replace('ZONE-', 'Zone ')} — {assignment.currentSacks}/{assignment.pallet.maxCapacity}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -538,8 +640,24 @@ const StockInPage: React.FC = () => {
                   </div>
                   <div className="p-3 bg-blue-50 rounded border border-blue-100 flex items-start gap-2">
                     <ShieldCheck className="w-4 h-4 text-blue-600 mt-0.5" />
-                    <p className="text-[11px] text-blue-700 leading-tight">System protocol: One currency type per pallet. Robot will retrieve this empty pallet for loading.</p>
+                    <p className="text-[11px] text-blue-700 leading-tight">System protocol: assignments stay inside the selected zone and only compatible pallets with enough remaining space can receive new sacks.</p>
                   </div>
+                  {!hasEligiblePallet && (
+                    <div className="p-3 border border-destructive/20 bg-destructive/5 rounded flex items-start gap-2">
+                      <XCircle className="w-4 h-4 text-destructive mt-0.5" />
+                      <p className="text-[11px] text-destructive leading-tight">No pallets currently satisfy the selected zone, capacity, and compatibility rules for this stock-in request.</p>
+                    </div>
+                  )}
+                  {assignmentWarnings.length > 0 && (
+                    <div className="p-3 border border-warning/20 bg-amber-50 rounded space-y-1.5">
+                      {assignmentWarnings.map((warning) => (
+                        <div key={warning} className="flex items-start gap-2 text-[11px] text-warning">
+                          <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span>{warning}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 <div className="p-4 bg-muted/30 rounded border space-y-3">
@@ -551,7 +669,7 @@ const StockInPage: React.FC = () => {
                     <div className="space-y-2 text-xs">
                       <div className="flex justify-between border-b border-muted pb-1"><span className="text-muted-foreground">Zone</span><span className="font-medium">{suggestedLocation.zone}</span></div>
                       <div className="flex justify-between border-b border-muted pb-1"><span className="text-muted-foreground">Rack</span><span className="font-mono">{suggestedLocation.code}</span></div>
-                      <div className="flex justify-between font-bold"><span className="text-muted-foreground">Status</span><span className="text-success uppercase">Valid Slot</span></div>
+                      <div className="flex justify-between font-bold"><span className="text-muted-foreground">Status</span><span className={effectiveAssignment?.allowed ? 'text-success uppercase' : 'text-warning uppercase'}>{effectiveAssignment?.allowed ? 'Valid Slot' : 'Review Rules'}</span></div>
                     </div>
                   ) : (
                     <p className="text-[11px] text-muted-foreground italic">Identify pallet to calculate destination...</p>
@@ -561,7 +679,7 @@ const StockInPage: React.FC = () => {
 
               <div className="flex justify-between pt-2">
                 <Button size="sm" variant="outline" onClick={() => setStep(1)}>Back</Button>
-                <Button size="sm" onClick={() => setStep(3)} disabled={!effectivePalletId}>Confirm & Initiate Protocol <ArrowRight className="w-3 h-3 ml-1" /></Button>
+                <Button size="sm" onClick={() => setStep(3)} disabled={!effectiveAssignment?.allowed}>Confirm & Initiate Protocol <ArrowRight className="w-3 h-3 ml-1" /></Button>
               </div>
             </div>
           )}
@@ -822,16 +940,70 @@ const StockInPage: React.FC = () => {
                 <span className="flex items-center gap-1"><div className="w-1.5 h-1.5 bg-success rounded-sm" /> Active Robot</span>
               </div>
             </div>
-            <div className="bg-card rounded-lg border border-border overflow-hidden h-[550px] relative shadow-sm">
-              <WarehouseCanvas
-                selectedSlotId={suggestedLocation?.locationId ?? null}
-                liveTask={liveTask}
-                onLiveTaskArrival={handleLiveTaskArrival}
-                completedStockIns={completedStockIns}
-                onSlotClick={(slot) => {
-                  if (step < 3 && slot.palletId) setPalletId(slot.palletId);
-                }}
-              />
+            <div className={`grid gap-4 ${step === 2 && assignmentPanel ? 'lg:grid-cols-[minmax(0,1fr)_260px]' : 'grid-cols-1'}`}>
+              <div className="bg-card rounded-lg border border-border overflow-hidden h-[550px] relative shadow-sm">
+                <WarehouseCanvas
+                  selectedSlotId={suggestedLocation?.locationId ?? null}
+                  liveTask={liveTask}
+                  onLiveTaskArrival={handleLiveTaskArrival}
+                  completedStockIns={completedStockIns}
+                  onSlotClick={(slot) => {
+                    if (
+                      step === 2 &&
+                      slot?.palletId &&
+                      slot.zoneId === targetZone?.zoneId &&
+                      allowedPalletIds.has(slot.palletId)
+                    ) {
+                      setPalletId(slot.palletId);
+                    }
+                  }}
+                />
+              </div>
+              {step === 2 && assignmentPanel && (
+                <div className="bg-card rounded-lg border border-border p-4 space-y-4 shadow-sm">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Pallet Detail</p>
+                      <p className="text-sm font-semibold text-foreground">{assignmentPanel.pallet.palletId}</p>
+                    </div>
+                    <div className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${assignmentPanel.allowed ? 'bg-success/10 text-success' : 'bg-amber-50 text-warning'}`}>
+                      {assignmentPanel.allowed ? 'Allowed' : 'Blocked'}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between border-b border-border pb-1"><span className="text-muted-foreground">Zone</span><span className="font-medium">{assignmentPanel.zoneName}</span></div>
+                    <div className="flex justify-between border-b border-border pb-1"><span className="text-muted-foreground">Rack</span><span className="font-mono">{assignmentPanel.pallet.locationCode || 'Unassigned'}</span></div>
+                    <div className="flex justify-between border-b border-border pb-1"><span className="text-muted-foreground">Current Sacks</span><span>{assignmentPanel.currentSacks}</span></div>
+                    <div className="flex justify-between border-b border-border pb-1"><span className="text-muted-foreground">Remaining Capacity</span><span>{assignmentPanel.remainingCapacity}</span></div>
+                    <div className="flex justify-between border-b border-border pb-1"><span className="text-muted-foreground">Incoming Sacks</span><span>{packageCount}</span></div>
+                    <div className="flex justify-between"><span className="text-muted-foreground">Assignment</span><span className={assignmentPanel.allowed ? 'text-success font-semibold' : 'text-warning font-semibold'}>{assignmentPanel.allowed ? 'Allowed for current stock-in' : 'Not allowed'}</span></div>
+                  </div>
+
+                  {assignmentPanel.currentSacks > 0 && (
+                    <div className="p-3 bg-muted/30 rounded border space-y-1.5 text-[11px]">
+                      <p className="font-bold uppercase tracking-wider text-muted-foreground">Existing Sack Profile</p>
+                      <p className="text-foreground">{assignmentPanel.existingCurrency ?? currency} {assignmentPanel.existingDenomination?.toLocaleString() ?? '-'} at {assignmentPanel.existingSackValue?.toLocaleString() ?? '-'} per sack</p>
+                    </div>
+                  )}
+
+                  {assignmentPanel.reasons.length > 0 ? (
+                    <div className="space-y-2">
+                      {assignmentPanel.reasons.map((reason) => (
+                        <div key={reason} className="flex items-start gap-2 p-3 rounded border border-warning/20 bg-amber-50 text-[11px] text-warning">
+                          <XCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                          <span>{reason}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="flex items-start gap-2 p-3 rounded border border-success/20 bg-success/5 text-[11px] text-success">
+                      <CheckCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <span>This pallet is in the selected zone, has enough space, and matches the current sack profile for FIFO-safe retrieval later.</span>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -6,7 +6,7 @@ import {
 } from "@/data/warehouseLayout";
 import { mockRobots, mockTasks, mockPallets, mockZones } from "@/data/mockData";
 import type { Robot, RobotTask, RouteWaypoint } from "@/data/types";
-import { Plus, Minus } from "lucide-react";
+import { LocateFixed, ZoomIn } from "lucide-react";
 
 // ─── Types ───
 interface CanvasRobot extends Robot {
@@ -848,7 +848,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       }}
     >
       <div
-        className="absolute left-4 top-4 z-10 flex items-center gap-[3px] rounded-[0.82rem] p-[3px] backdrop-blur-xl"
+        className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-xl p-1 backdrop-blur-xl"
         style={{
           background: controlPalette.panelBg,
           border: `1px solid ${controlPalette.panelBorder}`,
@@ -856,23 +856,24 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
         }}
       >
         {(() => {
-          const plusActive = zoomLevel > 1;
-          const minusActive = false;
-          const resetActive = zoomLevel === 1;
-          const styleFor = (active: boolean) => ({
-            background: active
-              ? controlPalette.activeBg
-              : controlPalette.buttonBg,
-            // Use a bright blue border for active (1:1) button, no shadow
-            border: active ? "2px solid #22d3ee" : "none",
-            color: active
-              ? controlPalette.activeText
-              : controlPalette.buttonText,
-            // Remove boxShadow for active, keep subtle for inactive
-            boxShadow: active ? "none" : "inset 0 1px 0 rgba(255,255,255,0.04)",
-          });
+          const baseButtonStyle = {
+            background: controlPalette.buttonBg,
+            color: controlPalette.buttonText,
+            border: `1px solid ${controlPalette.buttonBorder}`,
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,0.04)",
+          };
+          const resetButtonStyle = zoomLevel === 1
+            ? {
+                ...baseButtonStyle,
+                background: controlPalette.activeBg,
+                color: controlPalette.activeText,
+                border: "1px solid #22d3ee",
+                boxShadow: controlPalette.activeShadow,
+              }
+            : baseButtonStyle;
           const hoverHandlers = (active: boolean) => ({
             onMouseEnter: (e: React.MouseEvent<HTMLButtonElement>) => {
+              if (active) return;
               e.currentTarget.style.background = controlPalette.buttonHoverBg;
               e.currentTarget.style.borderColor =
                 controlPalette.buttonHoverBorder;
@@ -884,6 +885,9 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
               e.currentTarget.style.borderColor = active
                 ? "#22d3ee"
                 : controlPalette.buttonBorder;
+              e.currentTarget.style.boxShadow = active
+                ? controlPalette.activeShadow
+                : "inset 0 1px 0 rgba(255,255,255,0.04)";
             },
           });
           return (
@@ -892,12 +896,13 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
                 type="button"
                 onClick={() => applyZoom(zoomLevel + ZOOM_STEP)}
                 disabled={zoomLevel >= MAX_ZOOM}
-                className="flex h-[30px] w-[30px] items-center justify-center rounded-[0.58rem] transition disabled:cursor-not-allowed disabled:opacity-35"
+                className="flex h-8 w-8 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-35"
                 aria-label="Zoom in"
                 title="Zoom in"
-                style={{}}
+                style={baseButtonStyle}
+                {...hoverHandlers(false)}
               >
-                <Plus className="h-[14px] w-[14px]" strokeWidth={2.35} />
+                <ZoomIn className="h-4 w-4" strokeWidth={2.1} />
               </button>
               <button
                 type="button"
@@ -905,12 +910,13 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
                   setZoomLevel(1);
                   setPanOffset({ x: 0, y: 0 });
                 }}
-                className="flex h-[30px] min-w-[42px] items-center justify-center rounded-[0.58rem] px-2 text-[0.78rem] font-semibold tracking-[0.01em] transition"
+                className="flex h-8 w-8 items-center justify-center rounded-lg transition"
                 aria-label="Reset zoom"
-                title="Reset zoom"
-                style={{}}
+                title="Reset to default view"
+                style={resetButtonStyle}
+                {...hoverHandlers(zoomLevel === 1)}
               >
-                1:1
+                <LocateFixed className="h-4 w-4" strokeWidth={2.1} />
               </button>
             </>
           );
