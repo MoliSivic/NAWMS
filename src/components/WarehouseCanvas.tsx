@@ -140,7 +140,7 @@ function initRobotPos(r: Robot): { x: number; y: number } {
 function robotColor(status: Robot["status"]): string {
   switch (status) {
     case "active":
-      return "#3b82f6";
+      return "#16a34a";
     case "idle":
       return "#9ca3af";
     case "charging":

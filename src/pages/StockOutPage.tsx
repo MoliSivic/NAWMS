@@ -388,10 +388,10 @@ const StockOutPage: React.FC = () => {
       if (pallet.currentPackageCount === 0) {
         pallet.status = "available";
         if (slot && slot.palletId === pallet.palletId) {
-          slot.palletId = null;
+          slot.palletId = pallet.palletId;
           slot.occupancy = 0;
         }
-        pallet.locationCode = "";
+        pallet.locationCode = currentLocation;
         return;
       }
 
