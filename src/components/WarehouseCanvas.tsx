@@ -77,6 +77,22 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
+function getLatestCompletedStockIn(
+  completedStockIns: WarehouseCanvasProps["completedStockIns"],
+  locationId: string,
+) {
+  if (!completedStockIns?.length) return null;
+
+  for (let i = completedStockIns.length - 1; i >= 0; i -= 1) {
+    const entry = completedStockIns[i];
+    if (entry.locationId === locationId) {
+      return entry;
+    }
+  }
+
+  return null;
+}
+
 function nearestRouteIndex(route: RouteWaypoint[], x: number, y: number) {
   let bestIdx = 0;
   let bestDist = Number.POSITIVE_INFINITY;
@@ -180,9 +196,9 @@ function getMapControlPalette() {
     buttonHoverBg: 'rgba(241,245,249,1)',
     buttonHoverBorder: 'rgba(59,130,246,0.24)',
     activeBg: 'rgba(248,250,252,0.94)',
-    activeBorder: 'rgba(34,211,238,0.95)',
+    activeBorder: 'hsl(var(--ring) / 0.95)',
     activeText: '#0f172a',
-    activeShadow: '0 0 0 2px rgba(34,211,238,0.18)',
+    activeShadow: '0 0 0 2px hsl(var(--ring) / 0.16)',
   };
 }
 
@@ -632,15 +648,31 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
 
         // Occupancy color
         let fill = p.slotEmpty;
-        let slotOccupancy = slot.occupancy;
         let slotPalletId = slot.palletId;
+        let slotOccupancy = slot.occupancy;
 
-        if (completedStockIns) {
-          const matchingLive = completedStockIns.find(c => c.locationId === slot.locationId);
-          if (matchingLive) {
-            slotPalletId = matchingLive.palletId;
-            slotOccupancy = matchingLive.packageCount / 40;
-          }
+        const palletById = slotPalletId
+          ? mockPallets.find((pallet) => pallet.palletId === slotPalletId)
+          : null;
+        const palletByLocation = mockPallets.find(
+          (pallet) =>
+            pallet.locationCode === slot.locationId &&
+            pallet.status !== "available",
+        );
+        const livePallet = palletById ?? palletByLocation ?? null;
+
+        if (livePallet) {
+          slotPalletId = livePallet.palletId;
+          slotOccupancy = livePallet.currentPackageCount / livePallet.maxCapacity;
+        }
+
+        const latestCompletedStockIn = getLatestCompletedStockIn(
+          completedStockIns,
+          slot.locationId,
+        );
+        if (!livePallet && latestCompletedStockIn) {
+          slotPalletId = latestCompletedStockIn.palletId;
+          slotOccupancy = latestCompletedStockIn.packageCount / 40;
         }
 
         let isTaskTarget = false;
@@ -848,7 +880,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
       }}
     >
       <div
-        className="absolute left-3 top-3 z-10 flex items-center gap-1 rounded-xl p-1 backdrop-blur-xl"
+        className="absolute left-3 top-3 z-10 flex items-center gap-0.5 rounded-lg p-0.5 backdrop-blur-xl"
         style={{
           background: controlPalette.panelBg,
           border: `1px solid ${controlPalette.panelBorder}`,
@@ -867,7 +899,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
                 ...baseButtonStyle,
                 background: controlPalette.activeBg,
                 color: controlPalette.activeText,
-                border: "1px solid #22d3ee",
+                border: `1px solid ${controlPalette.activeBorder}`,
                 boxShadow: controlPalette.activeShadow,
               }
             : baseButtonStyle;
@@ -883,7 +915,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
                 ? controlPalette.activeBg
                 : controlPalette.buttonBg;
               e.currentTarget.style.borderColor = active
-                ? "#22d3ee"
+                ? controlPalette.activeBorder
                 : controlPalette.buttonBorder;
               e.currentTarget.style.boxShadow = active
                 ? controlPalette.activeShadow
@@ -896,13 +928,13 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
                 type="button"
                 onClick={() => applyZoom(zoomLevel + ZOOM_STEP)}
                 disabled={zoomLevel >= MAX_ZOOM}
-                className="flex h-8 w-8 items-center justify-center rounded-lg transition disabled:cursor-not-allowed disabled:opacity-35"
+                className="flex h-7 w-7 items-center justify-center rounded-md transition disabled:cursor-not-allowed disabled:opacity-35"
                 aria-label="Zoom in"
                 title="Zoom in"
                 style={baseButtonStyle}
                 {...hoverHandlers(false)}
               >
-                <ZoomIn className="h-4 w-4" strokeWidth={2.1} />
+                <ZoomIn className="h-3.5 w-3.5" strokeWidth={2.1} />
               </button>
               <button
                 type="button"
@@ -910,13 +942,13 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
                   setZoomLevel(1);
                   setPanOffset({ x: 0, y: 0 });
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg transition"
+                className="flex h-7 w-7 items-center justify-center rounded-md transition"
                 aria-label="Reset zoom"
                 title="Reset to default view"
                 style={resetButtonStyle}
                 {...hoverHandlers(zoomLevel === 1)}
               >
-                <LocateFixed className="h-4 w-4" strokeWidth={2.1} />
+                <LocateFixed className="h-3.5 w-3.5" strokeWidth={2.1} />
               </button>
             </>
           );
