@@ -176,7 +176,8 @@ function getCanvasPalette() {
     slotFull: '#ef4444',
     slotHalf: '#f59e0b',
     slotLow: '#10b981',
-    slotActiveJob: '#3b82f6',
+    slotActiveJob: '#16a34a',
+    slotActiveGlow: 'rgba(22,163,74,0.12)',
     slotSelected: '#2563eb',
     robotStroke: '#fff',
     robotLabel: '#fff',
@@ -681,9 +682,7 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
           if (liveTask.status === 'retrieving' && slot.locationId === liveTask.sourceLocation) isTaskTarget = true;
         }
 
-        if (isTaskTarget) {
-          fill = p.slotActiveJob;
-        } else if (slotPalletId) {
+        if (slotPalletId) {
           if (slotOccupancy === 0) fill = p.slotPalletOnly;
           else if (slotOccupancy > 0.8) fill = p.slotFull;
           else if (slotOccupancy >= 0.5) fill = p.slotHalf;
@@ -693,7 +692,16 @@ const WarehouseCanvas: React.FC<WarehouseCanvasProps> = ({
         const isSelected = selectedSlotId === slot.locationId;
         ctx.fillStyle = fill;
         ctx.fillRect(rx, ry, slotW, slotH);
-        if (isSelected) {
+        if (isTaskTarget) {
+          ctx.save();
+          ctx.strokeStyle = p.slotActiveJob;
+          ctx.lineWidth = 2;
+          ctx.shadowColor = p.slotActiveGlow;
+          ctx.shadowBlur = 8;
+          ctx.strokeRect(rx - 2, ry - 2, slotW + 4, slotH + 4);
+          ctx.restore();
+        }
+        if (isSelected && !isTaskTarget) {
           ctx.strokeStyle = p.slotSelected;
           ctx.lineWidth = 2;
           ctx.strokeRect(rx - 1, ry - 1, slotW + 2, slotH + 2);
