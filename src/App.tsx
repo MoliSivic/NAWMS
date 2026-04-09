@@ -46,8 +46,8 @@ const AuthGate: React.FC = () => {
         <Route path="/shelf-3d" element={<RoleGuard roles={['admin', 'operator']}><Shelf3DPage /></RoleGuard>} />
         <Route path="/inventory" element={<RoleGuard roles={['admin', 'operator']}><InventoryPage /></RoleGuard>} />
         <Route path="/pallets" element={<RoleGuard roles={['admin', 'operator']}><PalletPage /></RoleGuard>} />
-        <Route path="/robots" element={<RoleGuard roles={['admin']}><RobotMonitorPage /></RoleGuard>} />
-        <Route path="/optimization" element={<RoleGuard roles={['admin']}><OptimizationPage /></RoleGuard>} />
+        <Route path="/robots" element={<RoleGuard roles={['admin', 'operator']}><RobotMonitorPage /></RoleGuard>} />
+        <Route path="/optimization" element={<RoleGuard roles={['admin', 'operator']}><OptimizationPage /></RoleGuard>} />
         <Route path="/approvals" element={<RoleGuard roles={['admin']}><ApprovalPage /></RoleGuard>} />
         <Route path="/audit" element={<RoleGuard roles={['admin']}><AuditPage /></RoleGuard>} />
         <Route path="/reports" element={<RoleGuard roles={['admin']}><ReportsPage /></RoleGuard>} />
