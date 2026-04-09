@@ -61,6 +61,8 @@ const StockInPage: React.FC = () => {
   const initialRetrievalTime = React.useRef(20);
 
   const isValidSackValue = getAllowedSackValues(singleDenom).includes(valuePerSack);
+  const isPackageCountValid = packageCount > 0;
+  const packageCountError = !isPackageCountValid ? 'Enter a sack count greater than 0 to continue.' : '';
 
   const handleDenomChange = (newDenom: number) => {
     setSingleDenom(newDenom);
@@ -471,7 +473,9 @@ const StockInPage: React.FC = () => {
                       placeholder="0"
                       value={packageCount === 0 ? '' : packageCount}
                       onChange={e => {
-                        const val = e.target.value === '' ? 0 : Number(e.target.value);
+                        const rawValue = e.target.value;
+                        const val = rawValue === '' ? 0 : Number(rawValue);
+                        if (!Number.isFinite(val)) return;
                         if (val <= 40) {
                           setPackageCount(val);
                         } else {
@@ -482,8 +486,11 @@ const StockInPage: React.FC = () => {
                           });
                         }
                       }}
-                      className="w-full h-9 px-3 border rounded text-sm bg-background font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                      className={`w-full h-9 px-3 border rounded text-sm bg-background font-mono [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${packageCountError ? 'border-destructive focus-visible:ring-destructive' : ''}`}
                     />
+                    {packageCountError && (
+                      <p className="mt-1 text-xs text-destructive">{packageCountError}</p>
+                    )}
                   </div>
                 </div>
 
@@ -496,7 +503,7 @@ const StockInPage: React.FC = () => {
               </div>
               <div className="flex justify-between pt-2">
                 <Button size="sm" variant="outline" onClick={() => setStep(0)}>Back</Button>
-                <Button size="sm" onClick={() => setStep(2)} disabled={!isValidSackValue}>Pallet Selection <ArrowRight className="w-3 h-3 ml-1" /></Button>
+                <Button size="sm" onClick={() => setStep(2)} disabled={!isValidSackValue || !isPackageCountValid}>Pallet Selection <ArrowRight className="w-3 h-3 ml-1" /></Button>
               </div>
             </div>
           )}
